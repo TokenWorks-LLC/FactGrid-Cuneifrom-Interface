@@ -102,9 +102,9 @@ export default function Home() {
 
           <ol className="border-t border-border">
             <li className="grid gap-3 border-b border-border py-6 sm:grid-cols-[8rem_1fr] sm:gap-8">
-              <span className="font-mono text-xs tracking-[0.1em] text-muted-foreground uppercase">Discover</span>
+              <span className="font-mono text-xs tracking-[0.1em] text-muted-foreground uppercase">Catalogue</span>
               <div>
-                <h3 className="font-heading text-2xl font-medium">Find a tablet</h3>
+                <h3 className="font-heading text-2xl font-medium">Locate a catalogue record</h3>
                 <p className="mt-2 max-w-[60ch] leading-7 text-muted-foreground">
                   Search names, FactGrid QIDs, and supported identifiers. Narrow
                   results by current holding, findspot, or period when the data is recorded.
@@ -112,9 +112,9 @@ export default function Home() {
               </div>
             </li>
             <li className="grid gap-3 border-b border-border py-6 sm:grid-cols-[8rem_1fr] sm:gap-8">
-              <span className="font-mono text-xs tracking-[0.1em] text-muted-foreground uppercase">Examine</span>
+              <span className="font-mono text-xs tracking-[0.1em] text-muted-foreground uppercase">Witnesses</span>
               <div>
-                <h3 className="font-heading text-2xl font-medium">Read what is known</h3>
+                <h3 className="font-heading text-2xl font-medium">Keep editions distinct</h3>
                 <p className="mt-2 max-w-[60ch] leading-7 text-muted-foreground">
                   Inspect identifiers, physical description, provenance, holding,
                   language, and text witnesses—while seeing omissions plainly.
@@ -122,9 +122,9 @@ export default function Home() {
               </div>
             </li>
             <li className="grid gap-3 border-b border-border py-6 sm:grid-cols-[8rem_1fr] sm:gap-8">
-              <span className="font-mono text-xs tracking-[0.1em] text-muted-foreground uppercase">Verify</span>
+              <span className="font-mono text-xs tracking-[0.1em] text-muted-foreground uppercase">Provenance</span>
               <div>
-                <h3 className="font-heading text-2xl font-medium">Return to the source</h3>
+                <h3 className="font-heading text-2xl font-medium">Verify in FactGrid</h3>
                 <p className="mt-2 max-w-[60ch] leading-7 text-muted-foreground">
                   Every record and edition keeps a route back to FactGrid or its
                   external source, where provenance and revision history belong.

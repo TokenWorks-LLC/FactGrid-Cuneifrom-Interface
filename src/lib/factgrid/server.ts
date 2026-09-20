@@ -79,6 +79,65 @@ export function createFactGridClient(options: FactGridClientOptions = {}) {
       status: 500,
     });
   }
+  if (
+    !Number.isSafeInteger(maxResponseBytes) ||
+    maxResponseBytes <= 0 ||
+    maxResponseBytes > 10_000_000
+  ) {
+    throw new FactGridError("INVALID_INPUT", "FactGrid response limit is out of range.", {
+      status: 500,
+    });
+  }
+
+  async function boundedResponseText(response: Response): Promise<string> {
+    const declaredLength = Number(response.headers.get("content-length"));
+    if (Number.isFinite(declaredLength) && declaredLength > maxResponseBytes) {
+      throw new FactGridError(
+        "UPSTREAM_RESPONSE_TOO_LARGE",
+        "FactGrid returned more data than this request permits.",
+        { status: 502 },
+      );
+    }
+    if (!response.body) {
+      throw new FactGridError("UPSTREAM_PROTOCOL", "FactGrid returned an empty response.", {
+        status: 502,
+        retryable: true,
+      });
+    }
+
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder("utf-8", { fatal: true });
+    let total = 0;
+    let body = "";
+    try {
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        if (!value) continue;
+        total += value.byteLength;
+        if (total > maxResponseBytes) {
+          await reader.cancel().catch(() => undefined);
+          throw new FactGridError(
+            "UPSTREAM_RESPONSE_TOO_LARGE",
+            "FactGrid returned more data than this request permits.",
+            { status: 502 },
+          );
+        }
+        body += decoder.decode(value, { stream: true });
+      }
+      body += decoder.decode();
+      return body;
+    } catch (cause) {
+      if (isFactGridError(cause)) throw cause;
+      throw new FactGridError("UPSTREAM_PROTOCOL", "FactGrid returned invalid UTF-8.", {
+        status: 502,
+        retryable: true,
+        cause,
+      });
+    } finally {
+      reader.releaseLock();
+    }
+  }
 
   async function requestJson<T>(url: URL, init: RequestInit = {}): Promise<T> {
     // Defense in depth: all requests must still resolve to one of the two fixed hosts/paths.
@@ -118,23 +177,7 @@ export function createFactGridClient(options: FactGridClientOptions = {}) {
         );
       }
 
-      const declaredLength = Number(response.headers.get("content-length"));
-      if (Number.isFinite(declaredLength) && declaredLength > maxResponseBytes) {
-        throw new FactGridError(
-          "UPSTREAM_RESPONSE_TOO_LARGE",
-          "FactGrid returned more data than this request permits.",
-          { status: 502 },
-        );
-      }
-
-      const body = await response.text();
-      if (new TextEncoder().encode(body).byteLength > maxResponseBytes) {
-        throw new FactGridError(
-          "UPSTREAM_RESPONSE_TOO_LARGE",
-          "FactGrid returned more data than this request permits.",
-          { status: 502 },
-        );
-      }
+      const body = await boundedResponseText(response);
       try {
         return JSON.parse(body) as T;
       } catch (cause) {
@@ -217,7 +260,9 @@ export function createFactGridClient(options: FactGridClientOptions = {}) {
     for (const entity of entities) {
       for (const qid of collectReferencedQids(entity)) ids.add(qid);
     }
-    const related = await getEntities([...ids]);
+    // Labels are presentation enhancements. Cap amplification from pathological
+    // records; uncapped references still display their safe QIDs.
+    const related = await getEntities([...ids].slice(0, FACTGRID_LIMITS.maxRelatedQids));
     const labels = new Map<string, string>();
     for (const [qid, entity] of related) labels.set(qid, labelForEntity(entity) ?? qid);
     return labels;
@@ -234,7 +279,6 @@ export function createFactGridClient(options: FactGridClientOptions = {}) {
       format: "json",
       formatversion: "2",
       prop: "revisions",
-      rvlimit: "1",
       rvprop: "ids|timestamp|content|contentmodel",
       rvslots: "main",
       titles: references.map((reference) => reference.title).join("|"),
@@ -300,7 +344,7 @@ export function createFactGridClient(options: FactGridClientOptions = {}) {
 
   async function searchTablets(input: SearchInput = {}): Promise<TabletSearchPage> {
     const normalized = normalizeSearchInput(input);
-    const rawLimit = Math.min(normalized.pageSize + 5, 50);
+    const rawLimit = normalized.pageSize + 1;
     const response = await mediaWikiApi<MediaWikiSearchResponse>(
       {
         action: "query",
@@ -341,9 +385,11 @@ export function createFactGridClient(options: FactGridClientOptions = {}) {
       const entity = entityMap.get(qid);
       return Boolean(entity && !entity.missing && entityIsCuneiformTablet(entity));
     });
-    // Fill the page from the validated look-ahead buffer instead of leaving a
-    // hole when CirrusSearch briefly retains a stale membership result.
-    const visibleQids = validQids.slice(0, normalized.pageSize);
+    // Preserve raw index boundaries across pages. A stale entry may leave a
+    // temporary hole, but a look-ahead result must not be pulled into this page
+    // and then repeated at the next page's fixed offset.
+    const windowQids = search.qids.slice(0, normalized.pageSize);
+    const visibleQids = windowQids.filter((qid) => validQids.includes(qid));
     const entities = visibleQids.map((qid) => entityMap.get(qid) as WikibaseEntity);
     const labels = await labelsFor(entities);
     const records = entities.map((entity) => adaptTabletEntity(entity, labels));
@@ -355,6 +401,7 @@ export function createFactGridClient(options: FactGridClientOptions = {}) {
         description: record.description,
         factGridUrl: record.factGridUrl,
         cdliIds: record.cdliIds,
+        inventoryNumbers: record.inventoryNumbers,
         holdings: record.holdings,
         findspots: record.findspots,
         periods: record.periods,
@@ -362,7 +409,8 @@ export function createFactGridClient(options: FactGridClientOptions = {}) {
       page: normalized.page,
       pageSize: normalized.pageSize,
       hasNextPage:
-        search.hasContinuation || validQids.length > normalized.pageSize,
+        search.hasContinuation ||
+        validQids.includes(search.qids[normalized.pageSize]),
     };
   }
 

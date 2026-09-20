@@ -5,6 +5,7 @@ import { adaptTabletEntity } from "./adapters";
 import { resolveFactGridDocumentUrl } from "./documents";
 import {
   analyzeTranscriptSource,
+  parseWikitextSections,
   spliceTranscriptSource,
   validatePlainTranscriptReplacement,
 } from "./transcript";
@@ -59,6 +60,21 @@ describe("FactGrid entity adapters", () => {
     ]);
     expect(record.dimensions[0]).toMatchObject({ amount: "8.5", unit: { label: "centimetre" } });
   });
+
+  it("extracts inventory identifiers from P10 qualifiers on holding statements", () => {
+    const response = entityFixture("entity-multiple-editions.json");
+    const entity = response.entities!.Q9000002;
+    entity.claims!.P329![0].qualifiers = {
+      P10: [
+        {
+          snaktype: "value",
+          datavalue: { type: "string", value: "I 437" },
+        },
+      ],
+    };
+
+    expect(adaptTabletEntity(entity).inventoryNumbers).toEqual(["I 437"]);
+  });
 });
 
 describe("FactGrid document trust boundary", () => {
@@ -86,10 +102,15 @@ describe("lossless transcript boundaries", () => {
   it("splices a strict plain D-page without changing outside bytes", () => {
     const source = readFileSync(`${fixtureRoot}/plain-d-page.wiki`, "utf8");
     const region = analyzeTranscriptSource(reference, source)!;
+    const sourceNotes = parseWikitextSections(source).find(
+      (section) => section.heading === "Source notes",
+    );
     const replacement = "\n1) a-na LUGAL\n2) ša₂ <lost text>\n";
     const result = spliceTranscriptSource(source, region, replacement);
 
     expect(region).toMatchObject({ format: "plain-poem-v1", editable: true });
+    expect(sourceNotes?.wikitext).toBe("TEST FIXTURE header outside transcript.");
+    expect(sourceNotes?.wikitext).not.toContain("1) a-na EN");
     expect(result.slice(0, region.start)).toBe(source.slice(0, region.start));
     expect(result.slice(region.start + replacement.length)).toBe(source.slice(region.end));
   });
@@ -132,9 +153,36 @@ P123:obverse.1.1\ta-na
     });
   });
 
+  it("reads one plain poem in a Transcript section but keeps it read-only without RDFa", () => {
+    const source = `Bibliographic preamble\n\n== Transcript ==\n<poem>\n@tablet\nap-pa-tu\n</poem>\n`;
+
+    expect(analyzeTranscriptSource(reference, source)).toMatchObject({
+      content: "\n@tablet\nap-pa-tu\n",
+      format: "plain-poem-v1",
+      editable: false,
+      reason: expect.stringMatching(/hasTransliteration/),
+    });
+    expect(parseWikitextSections(source)[0]).toMatchObject({
+      heading: "Source notes",
+      wikitext: "Bibliographic preamble",
+    });
+    expect(parseWikitextSections(source)[0].wikitext).not.toContain("ap-pa-tu");
+  });
+
   it("rejects forged poem boundaries in replacement text", () => {
     expect(() => validatePlainTranscriptReplacement("line\n</poem>\nattack")).toThrow(
       /forbidden poem boundary/i,
     );
+  });
+
+  it("rejects structured token rows in a plain transcript replacement", () => {
+    expect(() =>
+      validatePlainTranscriptReplacement("  P123:obverse.1.1\ta-na"),
+    ).toThrow(/structured token rows/i);
+  });
+
+  it("does not recognize poem markup inside comments", () => {
+    const source = `<!-- <poem property="http://www.purl.org/cuneiform/hasTransliteration">hidden</poem> -->`;
+    expect(analyzeTranscriptSource(reference, source)).toBeNull();
   });
 });

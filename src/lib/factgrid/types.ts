@@ -105,6 +105,7 @@ export interface TabletRecord {
   revisionId?: number;
   modified?: string;
   cdliIds: string[];
+  inventoryNumbers: string[];
   holdings: LabeledEntity[];
   findspots: LabeledEntity[];
   periods: LabeledEntity[];
@@ -125,6 +126,7 @@ export type TabletSearchResult = Pick<
   | "description"
   | "factGridUrl"
   | "cdliIds"
+  | "inventoryNumbers"
   | "holdings"
   | "findspots"
   | "periods"
@@ -159,6 +161,7 @@ export interface WikibaseStatement {
   id?: string;
   rank?: "preferred" | "normal" | "deprecated";
   mainsnak?: WikibaseSnak;
+  qualifiers?: Record<string, WikibaseSnak[]>;
 }
 
 export interface WikibaseTerm {

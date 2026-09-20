@@ -22,7 +22,20 @@ const nextConfig: NextConfig = {
     ],
   },
   async headers() {
+    const contentSecurityPolicy = [
+      "default-src 'self'",
+      `script-src 'self' 'unsafe-inline'${process.env.NODE_ENV === "development" ? " 'unsafe-eval'" : ""}`,
+      "style-src 'self' 'unsafe-inline'",
+      "img-src 'self' data: blob: https://commons.wikimedia.org https://thumb.wikimedia.org https://upload.wikimedia.org https://database.factgrid.de",
+      "font-src 'self' data:",
+      `connect-src 'self'${process.env.NODE_ENV === "development" ? " ws: wss:" : ""}`,
+      "object-src 'none'",
+      "base-uri 'self'",
+      "frame-ancestors 'none'",
+      "form-action 'self'",
+    ].join("; ");
     const securityHeaders = [
+      { key: "Content-Security-Policy", value: contentSecurityPolicy },
       { key: "X-Content-Type-Options", value: "nosniff" },
       { key: "X-Frame-Options", value: "DENY" },
       { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },

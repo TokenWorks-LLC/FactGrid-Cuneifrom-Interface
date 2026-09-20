@@ -136,13 +136,15 @@ export function getAuthConfiguration(
 
 export function sanitizeReturnPath(value: string | null | undefined): string {
   if (!value) return "/";
+  if (value.length > 2_048) return "/";
   if (!value.startsWith("/") || value.startsWith("//")) return "/";
   if (value.includes("\\") || /[\u0000-\u001f\u007f]/u.test(value)) return "/";
 
   try {
     const parsed = new URL(value, "https://local.invalid");
     if (parsed.origin !== "https://local.invalid") return "/";
-    return `${parsed.pathname}${parsed.search}${parsed.hash}`;
+    const normalized = `${parsed.pathname}${parsed.search}${parsed.hash}`;
+    return normalized.length <= 2_048 ? normalized : "/";
   } catch {
     return "/";
   }

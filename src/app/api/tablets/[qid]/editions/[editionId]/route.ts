@@ -157,7 +157,7 @@ export async function PUT(
   let writeRequest: Awaited<ReturnType<typeof parseTranscriptWriteRequest>>;
   try {
     writeRequest = await parseTranscriptWriteRequest(request);
-    writeRateLimiter.check(sessionToken);
+    writeRateLimiter.check(session.providerUserId);
   } catch (error) {
     if (isTranscriptEditError(error)) return transcriptErrorResponse(error);
     return errorResponse(400, "invalid_request", "The transcript edit request is invalid.");
@@ -186,7 +186,13 @@ export async function PUT(
       request: writeRequest,
     });
 
-    revalidatePath(`/tablets/${qid}`);
+    // The FactGrid write and readback are already confirmed. A local cache
+    // invalidation failure must not turn that success into an ambiguous retry.
+    try {
+      revalidatePath(`/tablets/${qid}`);
+    } catch {
+      // The short public revalidation window remains the safe fallback.
+    }
     return privateJson({
       revisionId: saved.revisionId,
       text: saved.text,

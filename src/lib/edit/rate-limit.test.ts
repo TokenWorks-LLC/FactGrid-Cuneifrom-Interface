@@ -5,7 +5,7 @@ vi.mock("server-only", () => ({}));
 import { WriteRateLimiter } from "./rate-limit";
 
 describe("WriteRateLimiter", () => {
-  it("limits each opaque session independently and resets after the window", () => {
+  it("limits each provider identity independently and resets after the window", () => {
     const limiter = new WriteRateLimiter({ maximumAttempts: 2, windowMs: 1_000 });
     limiter.check("session-a", 10_000);
     limiter.check("session-a", 10_001);

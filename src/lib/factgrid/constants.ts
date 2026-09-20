@@ -11,6 +11,7 @@ export const CUNEIFORM_CATALOGUE_QID = "Q512006" as const;
 
 export const FACTGRID_PROPERTIES = Object.freeze({
   membership: "P2",
+  inventoryNumber: "P10",
   title: "P11",
   language: "P18",
   dimensions: Object.freeze({
@@ -37,6 +38,7 @@ export const FACTGRID_LIMITS = Object.freeze({
   maxQueryLength: 100,
   maxDocumentPages: 12,
   maxWbgetentitiesBatch: 50,
+  maxRelatedQids: 250,
   timeoutMs: 8_000,
   maxResponseBytes: 3_000_000,
   maxTranscriptBytes: 500_000,

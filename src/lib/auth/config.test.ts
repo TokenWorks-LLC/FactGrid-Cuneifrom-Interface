@@ -69,6 +69,7 @@ describe("return paths and editor configuration", () => {
     ["//evil.example/path", "/"],
     ["/\\evil.example/path", "/"],
     ["javascript:alert(1)", "/"],
+    [`/${"a".repeat(2_049)}`, "/"],
     [null, "/"],
   ])("normalizes %s to a relative-only destination", (value, expected) => {
     expect(sanitizeReturnPath(value)).toBe(expected);

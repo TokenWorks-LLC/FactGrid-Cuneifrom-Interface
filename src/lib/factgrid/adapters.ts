@@ -65,6 +65,22 @@ function statementStringValue(statement: WikibaseStatement): string | undefined 
     : undefined;
 }
 
+function qualifierStringValues(
+  statements: WikibaseStatement[],
+  property: string,
+): string[] {
+  const values: string[] = [];
+  for (const statement of statements) {
+    for (const snak of statement.qualifiers?.[property] ?? []) {
+      const value = snak.datavalue?.value;
+      if (snak.snaktype === "value" && typeof value === "string" && value.trim()) {
+        values.push(value.trim());
+      }
+    }
+  }
+  return values;
+}
+
 function safeStatementId(value: string | undefined, qid: Qid): string | undefined {
   if (!value || value.length > 120) return undefined;
   return new RegExp(`^${qid}\\$[A-Za-z0-9-]+$`).test(value) ? value : undefined;
@@ -234,6 +250,7 @@ export function adaptTabletEntity(entity: WikibaseEntity, labels: LabelMap = {})
   const title = rawTitle ?? bestTerm(entity.labels) ?? qid;
   const description = bestTerm(entity.descriptions);
   const sources = sourceLinks(entity);
+  const holdingStatements = activeStatements(entity, FACTGRID_PROPERTIES.presentHolding);
   const documentStatements = activeStatements(entity, FACTGRID_PROPERTIES.documentPage).filter(
     (statement) => statementStringValue(statement) !== undefined,
   );
@@ -271,6 +288,11 @@ export function adaptTabletEntity(entity: WikibaseEntity, labels: LabelMap = {})
     revisionId: entity.lastrevid,
     modified: entity.modified,
     cdliIds: [...new Set(stringValues(entity, FACTGRID_PROPERTIES.cdliId))],
+    inventoryNumbers: [
+      ...new Set(
+        qualifierStringValues(holdingStatements, FACTGRID_PROPERTIES.inventoryNumber),
+      ),
+    ],
     holdings: toLabels(FACTGRID_PROPERTIES.presentHolding),
     findspots: toLabels(FACTGRID_PROPERTIES.findspot),
     periods: toLabels(FACTGRID_PROPERTIES.period),

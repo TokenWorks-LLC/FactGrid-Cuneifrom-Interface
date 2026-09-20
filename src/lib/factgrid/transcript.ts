@@ -6,12 +6,12 @@ import type {
   TranscriptRegion,
 } from "./types";
 
-const TARGET_POEM_OPEN = /<poem\b[^>]*\bhasTransliteration\b[^>]*>/gi;
+const POEM_OPEN = /<poem\b[^>]*>/gi;
 const TARGET_POEM_CLOSE = /<\/poem\s*>/gi;
 const STRUCTURAL_WIKITEXT =
-  /(?:\{\{|\[\[|^\s*\{\||^\s*\|\}|<\/?(?:span|ref|table|tbody|thead|tr|td|th|div)\b)/im;
+  /(?:\{\{|\[\[|<!--|-->|__[A-Z][A-Z0-9_]*__|^\s*\{\||^\s*\|\}|<\/?(?:span|ref|table|tbody|thead|tr|td|th|div|nowiki|gallery|script|style|iframe|object|embed|form|input|textarea|button|a)\b)/im;
 const STRUCTURED_TRANSCRIPT_ROWS =
-  /(?:^P[0-9A-Za-z]+:[^\t\r\n]+\t)|(?:^\d+(?:[-.]\d+)?\t(?:[^\t\r\n]*\t){2,})/m;
+  /(?:^[ \t]*P[0-9A-Za-z]+:[^\t\r\n]+\t)|(?:^[ \t]*\d+(?:[-.]\d+)?\t(?:[^\t\r\n]*\t){2,})/m;
 
 function utf8Length(value: string): number {
   return new TextEncoder().encode(value).byteLength;
@@ -21,8 +21,7 @@ function utf8Length(value: string): number {
 export function parseWikitextSections(source: string): ParsedWikitextSection[] {
   const headingPattern = /^(={2,6})\s*([^\r\n=].*?)\s*\1\s*$/gm;
   const headings = Array.from(source.matchAll(headingPattern));
-
-  return headings.map((heading, index) => {
+  const sections = headings.map((heading, index) => {
     const contentStart = (heading.index ?? 0) + heading[0].length;
     const contentEnd = headings[index + 1]?.index ?? source.length;
     return {
@@ -31,21 +30,71 @@ export function parseWikitextSections(source: string): ParsedWikitextSection[] {
       wikitext: source.slice(contentStart, contentEnd).replace(/^\r?\n/, ""),
     };
   });
+  const firstPoem = source.search(/<poem\b/iu);
+  const preambleEnd = Math.min(
+    headings[0]?.index ?? source.length,
+    firstPoem >= 0 ? firstPoem : source.length,
+  );
+  const preamble = source.slice(0, preambleEnd).trim();
+  return preamble
+    ? [{ heading: "Source notes", level: 1, wikitext: preamble }, ...sections]
+    : sections;
+}
+
+function hasTransliterationProperty(openingTag: string): boolean {
+  const match = openingTag.match(/\bproperty\s*=\s*(?:"([^"]*)"|'([^']*)')/iu);
+  const value = match?.[1] ?? match?.[2];
+  return value
+    ?.split(/\s+/u)
+    .includes("http://www.purl.org/cuneiform/hasTransliteration") ?? false;
+}
+
+function isInsideExcludedWikitextContext(source: string, index: number): boolean {
+  const prefix = source.slice(0, index).toLowerCase();
+  return (
+    prefix.lastIndexOf("<!--") > prefix.lastIndexOf("-->") ||
+    prefix.lastIndexOf("<nowiki") > prefix.lastIndexOf("</nowiki")
+  );
+}
+
+function isInsideTranscriptSection(source: string, index: number): boolean {
+  const headingPattern = /^(={2,6})\s*([^\r\n=].*?)\s*\1\s*$/gm;
+  const headings = Array.from(source.matchAll(headingPattern));
+  return headings.some((heading, headingIndex) => {
+    if (!/^transcript(?:ion)?$|^transliteration$/iu.test(heading[2].trim())) return false;
+    const start = (heading.index ?? 0) + heading[0].length;
+    const end = headings[headingIndex + 1]?.index ?? source.length;
+    return index >= start && index < end;
+  });
 }
 
 /**
- * Finds one exact hasTransliteration poem boundary. Mixed D-pages are readable
- * but deliberately not editable; simple derived edition pages can be spliced.
+ * Finds one exact hasTransliteration poem boundary, or one unambiguous poem in
+ * a Transcript/Transliteration section for read-only display. Only the exact
+ * RDFa property form can become editable.
  */
 export function analyzeTranscriptSource(
   reference: DocumentReference,
   source: string,
 ): TranscriptRegion | null {
-  TARGET_POEM_OPEN.lastIndex = 0;
-  const openings = Array.from(source.matchAll(TARGET_POEM_OPEN));
-  if (openings.length !== 1) return null;
+  POEM_OPEN.lastIndex = 0;
+  const allOpenings = Array.from(source.matchAll(POEM_OPEN));
+  const eligibleOpenings = allOpenings.filter(
+    (opening) => !isInsideExcludedWikitextContext(source, opening.index ?? -1),
+  );
+  const attributedOpenings = eligibleOpenings.filter((opening) =>
+    hasTransliterationProperty(opening[0]),
+  );
+  const opening =
+    attributedOpenings.length === 1
+      ? attributedOpenings[0]
+      : attributedOpenings.length === 0 &&
+          eligibleOpenings.length === 1 &&
+          isInsideTranscriptSection(source, eligibleOpenings[0].index ?? -1)
+        ? eligibleOpenings[0]
+        : undefined;
+  if (!opening) return null;
 
-  const opening = openings[0];
   const start = (opening.index ?? 0) + opening[0].length;
   TARGET_POEM_CLOSE.lastIndex = start;
   const closing = TARGET_POEM_CLOSE.exec(source);
@@ -55,21 +104,24 @@ export function analyzeTranscriptSource(
   const mixed = STRUCTURAL_WIKITEXT.test(content);
   const structured = STRUCTURED_TRANSCRIPT_ROWS.test(content);
   const verifiedEditionKind = reference.kind === "d";
+  const verifiedProperty = hasTransliterationProperty(opening[0]);
 
   return {
     format: mixed ? "mixed-wikitext" : structured ? "structured-lines" : "plain-poem-v1",
     content,
     displayText: content.trim(),
-    editable: !mixed && !structured && verifiedEditionKind,
+    editable: !mixed && !structured && verifiedEditionKind && verifiedProperty,
     start,
     end: closing.index,
     reason: mixed
       ? "This edition contains structured or mixed wikitext and is read-only."
       : structured
         ? "This token-column transcript is read-only."
-      : !verifiedEditionKind
-        ? "Only verified plain D-Q document pages are supported for editing."
-        : undefined,
+        : !verifiedEditionKind
+          ? "Only verified plain D-Q document pages are supported for editing."
+          : !verifiedProperty
+            ? "This poem is readable, but it lacks the verified hasTransliteration property required for editing."
+            : undefined,
   };
 }
 
@@ -86,6 +138,11 @@ export function validatePlainTranscriptReplacement(replacement: string): void {
   if (STRUCTURAL_WIKITEXT.test(replacement)) {
     throw new FactGridInputError(
       "Structured wiki markup is not supported by the plain transcript editor.",
+    );
+  }
+  if (STRUCTURED_TRANSCRIPT_ROWS.test(replacement)) {
+    throw new FactGridInputError(
+      "Structured token rows are not supported by the plain transcript editor.",
     );
   }
 }

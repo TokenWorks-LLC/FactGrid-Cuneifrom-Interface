@@ -1,5 +1,5 @@
 import Database from "better-sqlite3";
-import { mkdirSync } from "node:fs";
+import { chmodSync, closeSync, mkdirSync, openSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 
 import { SESSION_TTL_SECONDS } from "./constants";
@@ -45,8 +45,15 @@ function tokenPurpose(kind: "access" | "refresh", idHash: string): string {
 }
 
 function prepareDatabase(path: string): Database.Database {
-  if (path !== ":memory:") mkdirSync(dirname(resolve(path)), { recursive: true });
-  const database = new Database(path);
+  let resolvedPath = path;
+  if (path !== ":memory:") {
+    resolvedPath = resolve(path);
+    mkdirSync(dirname(resolvedPath), { recursive: true, mode: 0o700 });
+    const descriptor = openSync(resolvedPath, "a", 0o600);
+    closeSync(descriptor);
+    chmodSync(resolvedPath, 0o600);
+  }
+  const database = new Database(resolvedPath);
   database.pragma("busy_timeout = 5000");
   database.pragma("journal_mode = WAL");
   return database;
@@ -83,6 +90,17 @@ export class SessionStore {
 
   create(input: NewSession, now = Date.now()): CreatedSession {
     this.cleanupExpired(now);
+    // One active application session per FactGrid identity limits session-table
+    // growth and makes a fresh login revoke the prior browser session.
+    this.database
+      .prepare("DELETE FROM auth_sessions WHERE provider_user_id = ?")
+      .run(input.providerUserId);
+    const activeSessions = this.database
+      .prepare("SELECT COUNT(*) AS count FROM auth_sessions")
+      .get() as { count: number };
+    if (activeSessions.count >= 10_000) {
+      throw new Error("The active session limit has been reached");
+    }
 
     const token = randomOpaqueToken();
     const idHash = hashOpaqueToken(token);

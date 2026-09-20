@@ -53,7 +53,7 @@ export default function AboutPage() {
             source record.
           </p>
 
-          <h2>Contribution status</h2>
+          <h2 id="contribution-status">Contribution status</h2>
           <p>
             Public reading does not require an account. FactGrid sign-in and
             transliteration editing are available only after a FactGrid OAuth

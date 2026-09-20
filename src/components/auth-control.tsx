@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { LogIn, LogOut } from "lucide-react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 
 import { buttonVariants } from "@/components/ui/button";
@@ -50,9 +51,13 @@ export function AuthControl() {
 
   if (session.status === "unavailable") {
     return (
-      <span className="font-mono text-[0.68rem] tracking-[0.08em] text-muted-foreground uppercase">
-        Reading mode
-      </span>
+      <Link
+        aria-label="Reading only; editing is unavailable. Learn why."
+        className="focus-ring min-h-11 content-center font-mono text-xs tracking-[0.06em] text-muted-foreground uppercase underline decoration-border underline-offset-4"
+        href="/about#contribution-status"
+      >
+        Reading only
+      </Link>
     );
   }
 

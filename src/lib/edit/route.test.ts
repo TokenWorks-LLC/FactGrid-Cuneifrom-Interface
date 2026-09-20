@@ -1,9 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-vi.mock("server-only", () => ({}));
-vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }));
-
 const mocks = vi.hoisted(() => ({
+  revalidatePath: vi.fn(),
   readSessionToken: vi.fn(),
   clearSessionCookie: vi.fn(),
   getUsableProviderSession: vi.fn(),
@@ -13,6 +11,9 @@ const mocks = vi.hoisted(() => ({
   fetchFactGridProfile: vi.fn(),
   saveTranscript: vi.fn(),
 }));
+
+vi.mock("server-only", () => ({}));
+vi.mock("next/cache", () => ({ revalidatePath: mocks.revalidatePath }));
 
 vi.mock("@/lib/auth/config", () => ({
   getAuthConfiguration: () => ({
@@ -74,6 +75,7 @@ describe("transcript write route authorization", () => {
     vi.clearAllMocks();
     mocks.hasValidCsrfToken.mockReturnValue(true);
     mocks.isSameOriginRequest.mockReturnValue(true);
+    mocks.revalidatePath.mockImplementation(() => undefined);
   });
 
   it("denies an anonymous direct API write", async () => {
@@ -109,5 +111,41 @@ describe("transcript write route authorization", () => {
     });
     expect(mocks.fetchFactGridProfile).not.toHaveBeenCalled();
     expect(mocks.saveTranscript).not.toHaveBeenCalled();
+  });
+
+  it("returns a confirmed save even when local cache invalidation fails", async () => {
+    mocks.readSessionToken.mockReturnValue("opaque-session");
+    mocks.getUsableProviderSession.mockResolvedValue({
+      providerUserId: "17",
+      username: "Editor",
+      accessToken: "provider-token",
+      refreshToken: null,
+      accessTokenExpiresAt: null,
+      expiresAt: Date.now() + 60_000,
+      csrfToken: "browser-csrf",
+    });
+    mocks.isApprovedEditor.mockReturnValue(true);
+    mocks.fetchFactGridProfile.mockResolvedValue({
+      providerUserId: "17",
+      username: "Editor",
+      blocked: false,
+      groups: [],
+      rights: ["edit"],
+    });
+    mocks.saveTranscript.mockResolvedValue({ revisionId: 101, text: "draft" });
+    mocks.revalidatePath.mockImplementation(() => {
+      throw new Error("cache unavailable");
+    });
+
+    const response = await PUT(request(), context);
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toMatchObject({
+      revisionId: 101,
+      text: "draft",
+    });
+    expect(mocks.saveTranscript).toHaveBeenCalledWith(
+      expect.objectContaining({ qid: "Q42", editionId: "Q42$A1-B2" }),
+    );
   });
 });

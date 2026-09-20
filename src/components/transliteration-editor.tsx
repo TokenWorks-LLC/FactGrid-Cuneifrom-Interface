@@ -169,7 +169,7 @@ export function TransliterationEditor({
               <Button
                 key={character}
                 aria-label={`Insert ${character}`}
-                className="size-10 rounded-none font-heading text-base"
+                className="size-11 rounded-none font-heading text-base"
                 onClick={() => insertCharacter(character)}
                 size="icon"
                 type="button"
@@ -181,7 +181,7 @@ export function TransliterationEditor({
           </div>
           <Textarea
             ref={textareaRef}
-            className="mt-3 min-h-96 resize-y rounded-none bg-card font-mono text-sm leading-6"
+            className="transcript-text mt-3 min-h-96 resize-y rounded-none bg-card text-sm leading-6"
             id="transliteration"
             onChange={(event) => {
               setText(event.target.value);
@@ -193,7 +193,7 @@ export function TransliterationEditor({
           <div className="mt-5">
             <Label htmlFor="edit-summary">Edit summary</Label>
             <input
-              className="mt-2 h-11 w-full border border-input bg-background px-3 text-sm focus-visible:outline-none"
+              className="mt-2 h-11 w-full border border-input bg-background px-3 text-sm"
               id="edit-summary"
               maxLength={255}
               onChange={(event) => setSummary(event.target.value)}
@@ -205,7 +205,7 @@ export function TransliterationEditor({
 
         <div>
           <p className="text-sm font-medium">Plain-text preview</p>
-          <pre className="mt-3 min-h-96 overflow-x-auto border border-border bg-card p-5 font-mono text-sm leading-6 whitespace-pre-wrap">
+          <pre className="transcript-text mt-3 min-h-96 overflow-x-auto border border-border bg-card p-5 text-sm leading-6 whitespace-pre-wrap">
             {text || "The transcript is empty."}
           </pre>
         </div>
@@ -223,7 +223,7 @@ export function TransliterationEditor({
       ) : null}
 
       <div className="mt-6 flex flex-wrap items-center gap-3">
-        <Button className="rounded-none" disabled={!dirty || saveState.status === "saving"} onClick={save} type="button">
+        <Button className="min-h-11 rounded-none" disabled={!dirty || saveState.status === "saving"} onClick={save} type="button">
           {saveState.status === "saving" ? (
             <>
               <LoaderCircle aria-hidden="true" className="size-4 animate-spin" />
@@ -233,7 +233,7 @@ export function TransliterationEditor({
             "Save to FactGrid"
           )}
         </Button>
-        <Button className="rounded-none" disabled={!dirty || saveState.status === "saving"} onClick={cancelChanges} type="button" variant="outline">
+        <Button className="min-h-11 rounded-none" disabled={!dirty || saveState.status === "saving"} onClick={cancelChanges} type="button" variant="outline">
           Cancel changes
         </Button>
         <span aria-live="polite" className="text-sm text-muted-foreground">

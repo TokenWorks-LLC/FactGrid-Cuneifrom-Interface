@@ -28,9 +28,10 @@ export class WriteRateLimiter {
     this.maximumSessions = options.maximumSessions ?? 1_000;
   }
 
-  check(sessionToken: string, now = Date.now()): void {
-    // Never retain the bearer-like opaque session value in process memory.
-    const key = createHash("sha256").update(sessionToken, "utf8").digest("base64url");
+  check(providerIdentity: string, now = Date.now()): void {
+    // Keep the provider identity pseudonymous in process memory. Keying by
+    // account prevents a fresh application session from resetting the budget.
+    const key = createHash("sha256").update(providerIdentity, "utf8").digest("base64url");
     const existing = this.buckets.get(key);
     if (!existing || now - existing.startedAt >= this.windowMs) {
       this.makeRoom(now);

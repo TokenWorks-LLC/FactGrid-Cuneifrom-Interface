@@ -25,12 +25,12 @@ export default function ErrorPage({
       <div className="max-w-2xl border-y border-border py-10">
         <AlertTriangle aria-hidden="true" className="size-8 text-primary" />
         <h1 className="mt-6 font-heading text-4xl font-medium tracking-[-0.025em]">
-          FactGrid could not be reached
+          This page could not be loaded
         </h1>
         <p className="mt-4 max-w-[58ch] leading-7 text-muted-foreground">
-          This is different from an empty result. The catalogue service may be
-          busy or temporarily unavailable. Try the request again, or continue in
-          FactGrid.
+          The request did not complete. A source service may be busy, or the
+          application may have encountered an unexpected problem. Try again, or
+          return to a public page.
         </p>
         <div className="mt-7 flex flex-wrap gap-3">
           <Button className="min-h-11 rounded-none px-4" onClick={reset} type="button">

@@ -1,10 +1,14 @@
 import Database from "better-sqlite3";
+import { mkdtempSync, rmSync, statSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 
 import { SESSION_TTL_SECONDS } from "./constants";
 import { SessionStore } from "./session-store";
 
 const stores: SessionStore[] = [];
+const temporaryDirectories: string[] = [];
 
 function store(): SessionStore {
   const value = new SessionStore(new Database(":memory:"), "s".repeat(32));
@@ -14,6 +18,9 @@ function store(): SessionStore {
 
 afterEach(() => {
   for (const value of stores.splice(0)) value.close();
+  for (const directory of temporaryDirectories.splice(0)) {
+    rmSync(directory, { recursive: true, force: true });
+  }
 });
 
 describe("SessionStore", () => {
@@ -93,5 +100,32 @@ describe("SessionStore", () => {
       refreshToken: "old-refresh",
       accessTokenExpiresAt: now + 60_000,
     });
+  });
+
+  it("revokes a prior session when the same FactGrid identity signs in again", () => {
+    const sessions = store();
+    const first = sessions.create({
+      providerUserId: "42",
+      username: "Scholar",
+      accessToken: "first-access",
+    });
+    const second = sessions.create({
+      providerUserId: "42",
+      username: "Scholar",
+      accessToken: "second-access",
+    });
+
+    expect(sessions.get(first.token)).toBeNull();
+    expect(sessions.get(second.token)).toMatchObject({ accessToken: "second-access" });
+  });
+
+  it("creates the persistent database with owner-only permissions", () => {
+    const directory = mkdtempSync(join(tmpdir(), "factgrid-session-test-"));
+    temporaryDirectories.push(directory);
+    const path = join(directory, "sessions.sqlite");
+    const sessions = SessionStore.open(path, "s".repeat(32));
+    stores.push(sessions);
+
+    expect(statSync(path).mode & 0o777).toBe(0o600);
   });
 });

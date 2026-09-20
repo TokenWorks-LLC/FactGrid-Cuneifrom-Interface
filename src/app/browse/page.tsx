@@ -5,8 +5,8 @@ import { ArrowLeft, ArrowRight, ExternalLink, Search } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import type { LabeledEntity, TabletFacets } from "@/lib/factgrid";
-import { getTabletFacets, searchTablets } from "@/lib/factgrid/server";
+import type { LabeledEntity, TabletSearchPage } from "@/lib/factgrid";
+import { searchTablets } from "@/lib/factgrid/server";
 import { cn } from "@/lib/utils";
 
 export const metadata: Metadata = {
@@ -42,6 +42,29 @@ function pageUrl(values: Record<string, string>, page: number): string {
   return query ? `/browse?${query}` : "/browse";
 }
 
+function contextualFacetOptions(
+  results: TabletSearchPage["results"],
+  property: "holdings" | "findspots" | "periods",
+  selected: string,
+): LabeledEntity[] {
+  const options = new Map<string, LabeledEntity>();
+  for (const result of results) {
+    for (const value of result[property]) options.set(value.id, value);
+  }
+  if (/^Q[1-9][0-9]{0,14}$/u.test(selected) && !options.has(selected)) {
+    options.set(selected, {
+      id: selected as LabeledEntity["id"],
+      label: selected,
+      url: `https://database.factgrid.de/wiki/Item:${selected}`,
+    });
+  }
+  const collator = new Intl.Collator("en", { numeric: true, sensitivity: "base" });
+  return [...options.values()].sort(
+    (left, right) =>
+      collator.compare(left.label, right.label) || left.id.localeCompare(right.id),
+  );
+}
+
 export default async function BrowsePage({ searchParams }: { searchParams: BrowseSearchParams }) {
   const raw = await searchParams;
   const values = {
@@ -53,21 +76,18 @@ export default async function BrowsePage({ searchParams }: { searchParams: Brows
   const pageValue = Number.parseInt(first(raw.page) || "1", 10);
   const page = Number.isSafeInteger(pageValue) ? Math.min(100, Math.max(1, pageValue)) : 1;
 
-  const [results, facetResult] = await Promise.all([
-    searchTablets({
-      q: values.q,
-      collection: values.collection || undefined,
-      findspot: values.findspot || undefined,
-      period: values.period || undefined,
-      page,
-    }),
-    getTabletFacets()
-      .then((facets) => ({ facets, unavailable: false as const }))
-      .catch(() => ({
-        facets: { collections: [], findspots: [], periods: [] } satisfies TabletFacets,
-        unavailable: true as const,
-      })),
-  ]);
+  const results = await searchTablets({
+    q: values.q,
+    collection: values.collection || undefined,
+    findspot: values.findspot || undefined,
+    period: values.period || undefined,
+    page,
+  });
+  const facets = {
+    collections: contextualFacetOptions(results.results, "holdings", values.collection),
+    findspots: contextualFacetOptions(results.results, "findspots", values.findspot),
+    periods: contextualFacetOptions(results.results, "periods", values.period),
+  };
 
   const hasFilters = Boolean(values.q || values.collection || values.findspot || values.period);
 
@@ -105,27 +125,25 @@ export default async function BrowsePage({ searchParams }: { searchParams: Brows
               <FacetSelect
                 label="Collection / holding"
                 name="collection"
-                options={facetResult.facets.collections}
+                options={facets.collections}
                 value={values.collection}
               />
               <FacetSelect
                 label="Finding spot"
                 name="findspot"
-                options={facetResult.facets.findspots}
+                options={facets.findspots}
                 value={values.findspot}
               />
               <FacetSelect
                 label="Period / style"
                 name="period"
-                options={facetResult.facets.periods}
+                options={facets.periods}
                 value={values.period}
               />
-
-              {facetResult.unavailable ? (
-                <p className="text-sm leading-5 text-muted-foreground">
-                  Filter lists are temporarily unavailable. Text search still works.
-                </p>
-              ) : null}
+              <p className="text-xs leading-5 text-muted-foreground">
+                Filter choices reflect values on this results page. FactGrid applies a selected
+                value to the catalogue before pagination.
+              </p>
 
               <div className="flex flex-wrap gap-2">
                 <Button className="min-h-11 flex-1 rounded-none px-4" type="submit">
@@ -191,6 +209,7 @@ export default async function BrowsePage({ searchParams }: { searchParams: Brows
                         <ResultFact label="Holding" values={tablet.holdings.map((value) => value.label)} />
                         <ResultFact label="Findspot" values={tablet.findspots.map((value) => value.label)} />
                         <ResultFact label="Period" values={tablet.periods.map((value) => value.label)} />
+                        <ResultFact label="Inventory" values={tablet.inventoryNumbers} />
                         <ResultFact label="CDLI" values={tablet.cdliIds} />
                       </dl>
                     </div>
