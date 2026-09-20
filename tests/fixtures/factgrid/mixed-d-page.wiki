@@ -1,0 +1,19 @@
+<span about="https://database.factgrid.de/entity/Q9000002">
+{{Template:CuneiformInfoBox|9000002}}
+== Commentary ==
+TEST FIXTURE commentary outside the editable text.
+
+== Transcript ==
+{| class="wikitable"
+| TEST FIXTURE image table outside the poem
+|}
+<poem property="http://www.purl.org/cuneiform/hasTransliteration" about="https://database.factgrid.de/entity/Q9000002">
+<span typeof="http://www.purl.org/cuneiform/Transliteration">
+1) a-na <span class="sign">EN</span><ref>TEST FIXTURE note</ref>
+2) ša₂ <lost text>
+</span>
+</poem>
+
+== Translation ==
+TEST FIXTURE translation that must remain byte-for-byte unchanged.
+</span>

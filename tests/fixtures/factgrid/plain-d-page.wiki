@@ -1,0 +1,6 @@
+TEST FIXTURE header outside transcript.
+<poem id="transliteration" property="http://www.purl.org/cuneiform/hasTransliteration" about="https://database.factgrid.de/entity/Q9000002">
+1) a-na EN
+2) ša₂ <lost text>
+</poem>
+TEST FIXTURE footer outside transcript.

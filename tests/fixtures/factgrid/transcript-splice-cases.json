@@ -1,0 +1,16 @@
+{
+  "fixtureOnly": true,
+  "reference": {
+    "kind": "d",
+    "qid": "Q9000002",
+    "title": "D-Q9000002",
+    "url": "https://database.factgrid.de/wiki/D-Q9000002"
+  },
+  "sourceFile": "plain-d-page.wiki",
+  "replacement": "\n1) a-na LUGAL\n2) ša₂ <lost text>\n",
+  "unchangedPrefix": "TEST FIXTURE header outside transcript.\n<poem id=\"transliteration\" property=\"http://www.purl.org/cuneiform/hasTransliteration\" about=\"https://database.factgrid.de/entity/Q9000002\">",
+  "unchangedSuffix": "</poem>\nTEST FIXTURE footer outside transcript.\n",
+  "expectedEditable": true,
+  "mixedSourceFile": "mixed-d-page.wiki",
+  "expectedMixedEditable": false
+}

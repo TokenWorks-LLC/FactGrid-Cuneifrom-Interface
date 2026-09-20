@@ -11,6 +11,11 @@ const nextConfig: NextConfig = {
       },
       {
         protocol: "https",
+        hostname: "thumb.wikimedia.org",
+        pathname: "/wikipedia/commons/thumb/**",
+      },
+      {
+        protocol: "https",
         hostname: "database.factgrid.de",
         pathname: "/w/images/**",
       },

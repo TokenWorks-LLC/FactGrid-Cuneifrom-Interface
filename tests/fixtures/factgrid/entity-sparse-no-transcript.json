@@ -1,0 +1,48 @@
+{
+  "fixtureOnly": true,
+  "response": {
+    "entities": {
+      "Q9000001": {
+        "pageid": 9000001,
+        "type": "item",
+        "id": "Q9000001",
+        "lastrevid": 101,
+        "modified": "2026-01-02T03:04:05Z",
+        "labels": {
+          "en": { "language": "en", "value": "TEST FIXTURE — sparse tablet" }
+        },
+        "descriptions": {},
+        "claims": {
+          "P2": [
+            {
+              "id": "Q9000001$fixture-membership",
+              "rank": "normal",
+              "mainsnak": {
+                "snaktype": "value",
+                "property": "P2",
+                "datatype": "wikibase-item",
+                "datavalue": {
+                  "type": "wikibase-entityid",
+                  "value": { "entity-type": "item", "numeric-id": 512006, "id": "Q512006" }
+                }
+              }
+            }
+          ],
+          "P11": [
+            {
+              "id": "Q9000001$fixture-title",
+              "rank": "normal",
+              "mainsnak": {
+                "snaktype": "value",
+                "property": "P11",
+                "datatype": "string",
+                "datavalue": { "type": "string", "value": "TEST FIXTURE — sparse tablet" }
+              }
+            }
+          ]
+        }
+      }
+    },
+    "success": 1
+  }
+}

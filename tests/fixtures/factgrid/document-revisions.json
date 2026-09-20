@@ -1,0 +1,31 @@
+{
+  "fixtureOnly": true,
+  "batchcomplete": true,
+  "query": {
+    "pages": [
+      {
+        "pageid": 9000200,
+        "ns": 0,
+        "title": "D-Q9000002",
+        "revisions": [{
+          "revid": 301,
+          "parentid": 300,
+          "timestamp": "2026-03-04T05:06:07Z",
+          "slots": { "main": { "contentmodel": "wikitext", "contentformat": "text/x-wiki", "content": "== Transcript ==\n<poem property=\"http://www.purl.org/cuneiform/hasTransliteration\">\n1) a-na EN\n</poem>\n" } }
+        }]
+      },
+      {
+        "pageid": 9000201,
+        "ns": 0,
+        "title": "CDLI-W-Q9000002",
+        "revisions": [{
+          "revid": 401,
+          "parentid": 400,
+          "timestamp": "2026-03-04T05:06:08Z",
+          "slots": { "main": { "contentmodel": "wikitext", "contentformat": "text/x-wiki", "content": "<poem property=\"http://www.purl.org/cuneiform/hasTransliteration\">\nPTEST002:obverse.1.1\ta-na\n</poem>\n" } }
+        }]
+      },
+      { "ns": 0, "title": "ORACC-W-Q9000002", "missing": true }
+    ]
+  }
+}

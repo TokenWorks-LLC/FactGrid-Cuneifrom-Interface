@@ -1,0 +1,94 @@
+{
+  "fixtureOnly": true,
+  "response": {
+    "entities": {
+      "Q9000002": {
+        "pageid": 9000002,
+        "type": "item",
+        "id": "Q9000002",
+        "lastrevid": 202,
+        "modified": "2026-02-03T04:05:06Z",
+        "labels": {
+          "en": { "language": "en", "value": "TEST FIXTURE — tablet with editions" }
+        },
+        "descriptions": {
+          "en": { "language": "en", "value": "Fabricated adapter fixture; not a live record." }
+        },
+        "claims": {
+          "P2": [{
+            "id": "Q9000002$fixture-membership",
+            "rank": "normal",
+            "mainsnak": { "snaktype": "value", "property": "P2", "datatype": "wikibase-item", "datavalue": { "type": "wikibase-entityid", "value": { "id": "Q512006" } } }
+          }],
+          "P11": [{
+            "id": "Q9000002$fixture-title",
+            "rank": "normal",
+            "mainsnak": { "snaktype": "value", "property": "P11", "datatype": "string", "datavalue": { "type": "string", "value": "TEST FIXTURE — tablet with editions" } }
+          }],
+          "P692": [{
+            "id": "Q9000002$fixture-cdli",
+            "rank": "normal",
+            "mainsnak": { "snaktype": "value", "property": "P692", "datatype": "external-id", "datavalue": { "type": "string", "value": "PTEST002" } }
+          }],
+          "P329": [{
+            "id": "Q9000002$fixture-holding",
+            "rank": "normal",
+            "mainsnak": { "snaktype": "value", "property": "P329", "datatype": "wikibase-item", "datavalue": { "type": "wikibase-entityid", "value": { "id": "Q9000100" } } }
+          }],
+          "P695": [{
+            "id": "Q9000002$fixture-findspot",
+            "rank": "normal",
+            "mainsnak": { "snaktype": "value", "property": "P695", "datatype": "wikibase-item", "datavalue": { "type": "wikibase-entityid", "value": { "id": "Q9000101" } } }
+          }],
+          "P853": [{
+            "id": "Q9000002$fixture-period",
+            "rank": "normal",
+            "mainsnak": { "snaktype": "value", "property": "P853", "datatype": "wikibase-item", "datavalue": { "type": "wikibase-entityid", "value": { "id": "Q9000102" } } }
+          }],
+          "P59": [{
+            "id": "Q9000002$fixture-height",
+            "rank": "normal",
+            "mainsnak": { "snaktype": "value", "property": "P59", "datatype": "quantity", "datavalue": { "type": "quantity", "value": { "amount": "+8.5", "unit": "https://database.factgrid.de/entity/Q102135" } } }
+          }],
+          "P69": [{
+            "id": "Q9000002$fixture-external",
+            "rank": "normal",
+            "mainsnak": { "snaktype": "value", "property": "P69", "datatype": "url", "datavalue": { "type": "string", "value": "https://example.invalid/transcript/PTEST002" } }
+          }],
+          "P251": [
+            {
+              "id": "Q9000002$d-fixture-guid",
+              "rank": "normal",
+              "mainsnak": { "snaktype": "value", "property": "P251", "datatype": "url", "datavalue": { "type": "string", "value": "https://database.factgrid.de/wiki/D-Q9000002" } }
+            },
+            {
+              "id": "Q9000002$cdli-fixture-guid",
+              "rank": "normal",
+              "mainsnak": { "snaktype": "value", "property": "P251", "datatype": "url", "datavalue": { "type": "string", "value": "https://database.factgrid.de/wiki/CDLI-W-Q9000002" } }
+            },
+            {
+              "id": "Q9000002$oracc-fixture-guid",
+              "rank": "normal",
+              "mainsnak": { "snaktype": "value", "property": "P251", "datatype": "url", "datavalue": { "type": "string", "value": "https://database.factgrid.de/wiki/ORACC-W-Q9000002" } }
+            },
+            {
+              "id": "Q9000002$unicode-fixture-guid",
+              "rank": "normal",
+              "mainsnak": { "snaktype": "value", "property": "P251", "datatype": "url", "datavalue": { "type": "string", "value": "https://database.factgrid.de/wiki/UNICODE-W-Q9000002" } }
+            },
+            {
+              "id": "Q9000002$broken-fixture-guid",
+              "rank": "normal",
+              "mainsnak": { "snaktype": "value", "property": "P251", "datatype": "url", "datavalue": { "type": "string", "value": "https://attacker.invalid/wiki/D-Q9000002" } }
+            },
+            {
+              "rank": "normal",
+              "mainsnak": { "snaktype": "value", "property": "P251", "datatype": "url", "datavalue": { "type": "string", "value": "https://database.factgrid.de/wiki/Experimental-W-Q9000002" } }
+            }
+          ]
+        }
+      }
+    },
+    "success": 1
+  }
+}
