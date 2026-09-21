@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState, type RefObject, type UIEvent } from "react";
+import { useRef, useState, useSyncExternalStore, type RefObject, type UIEvent } from "react";
 
 export interface ComparableEdition {
   id: string;
@@ -9,9 +9,18 @@ export interface ComparableEdition {
   text: string;
 }
 
+const subscribeToHydration = () => () => undefined;
+const getHydratedSnapshot = () => true;
+const getServerHydrationSnapshot = () => false;
+
 export function EditionComparison({ editions }: { editions: ComparableEdition[] }) {
   const [leftIndex, setLeftIndex] = useState(0);
   const [rightIndex, setRightIndex] = useState(1);
+  const interactive = useSyncExternalStore(
+    subscribeToHydration,
+    getHydratedSnapshot,
+    getServerHydrationSnapshot,
+  );
   const leftRef = useRef<HTMLPreElement>(null);
   const rightRef = useRef<HTMLPreElement>(null);
   const synchronizing = useRef(false);
@@ -37,7 +46,11 @@ export function EditionComparison({ editions }: { editions: ComparableEdition[] 
   const right = editions[rightIndex] ?? editions[1];
 
   return (
-    <section aria-labelledby="comparison-title" className="border-b border-border py-8">
+    <section
+      aria-busy={!interactive}
+      aria-labelledby="comparison-title"
+      className="border-b border-border py-8"
+    >
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div>
           <p className="font-mono text-xs tracking-[0.1em] text-muted-foreground uppercase">
@@ -56,6 +69,7 @@ export function EditionComparison({ editions }: { editions: ComparableEdition[] 
         <ComparisonPane
           edition={left}
           editions={editions}
+          interactive={interactive}
           onChange={setLeftIndex}
           onScroll={(event) => synchronize(event, rightRef)}
           pane="left"
@@ -65,6 +79,7 @@ export function EditionComparison({ editions }: { editions: ComparableEdition[] 
         <ComparisonPane
           edition={right}
           editions={editions}
+          interactive={interactive}
           onChange={setRightIndex}
           onScroll={(event) => synchronize(event, leftRef)}
           pane="right"
@@ -79,6 +94,7 @@ export function EditionComparison({ editions }: { editions: ComparableEdition[] 
 function ComparisonPane({
   edition,
   editions,
+  interactive,
   onChange,
   onScroll,
   pane,
@@ -87,6 +103,7 @@ function ComparisonPane({
 }: {
   edition: ComparableEdition;
   editions: ComparableEdition[];
+  interactive: boolean;
   onChange: (value: number) => void;
   onScroll: (event: UIEvent<HTMLPreElement>) => void;
   pane: "left" | "right";
@@ -100,6 +117,7 @@ function ComparisonPane({
       </label>
       <select
         className="mt-2 min-h-11 w-full border border-input bg-background px-3 text-sm"
+        disabled={!interactive}
         id={`comparison-${pane}`}
         onChange={(event) => onChange(Number(event.target.value))}
         value={value}

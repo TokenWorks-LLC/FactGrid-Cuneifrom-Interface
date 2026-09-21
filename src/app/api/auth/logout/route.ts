@@ -32,7 +32,14 @@ function sessionRevocationUnavailable(
 
 export async function POST(request: NextRequest): Promise<NextResponse> {
   const result = getAuthConfiguration();
-  if (!result.available) return authUnavailable();
+  if (!result.available) {
+    const response = authUnavailable();
+    // OAuth configuration can disappear while a browser still holds a local
+    // credential. Revocation cannot be confirmed without the configured store,
+    // but the browser must not retain a session that could silently revive.
+    clearSessionCookie(response, { secureCookies: process.env.NODE_ENV === "production" });
+    return response;
+  }
 
   if (!isSameOriginRequest(request, result.config.appOrigin)) {
     return privateJson(

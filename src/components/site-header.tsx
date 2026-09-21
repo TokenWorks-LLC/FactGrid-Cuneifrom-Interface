@@ -28,39 +28,34 @@ export function SiteHeader() {
   }
 
   return (
-    <header className="sticky top-0 z-40 border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/88">
-      <div className="site-container flex min-h-16 items-center gap-5 py-2">
+    <header className="relative z-40 border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/88 lg:sticky lg:top-0">
+      <div className="site-container grid grid-cols-1 gap-2 py-2 lg:min-h-16 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-center lg:gap-5">
         <Link
           href="/"
-          className="focus-ring mr-auto max-w-52 font-heading text-lg leading-5 font-semibold tracking-[-0.01em] sm:max-w-none"
+          className="focus-ring inline-flex min-h-11 max-w-52 items-center font-heading text-lg leading-5 font-semibold tracking-[-0.01em] sm:max-w-none lg:min-h-0"
         >
           {SITE.name}
         </Link>
-        <nav aria-label="Primary" className="hidden items-center gap-6 md:flex">
-          {navigationLink("/browse", "Browse")}
-          {navigationLink("/about", "About")}
-          <a
-            className="nav-link inline-flex items-center gap-1.5"
-            href={SITE.factGridOrigin}
-            rel="noreferrer"
-            target="_blank"
-          >
-            FactGrid
-            <ExternalLink aria-hidden="true" className="size-3.5" />
-          </a>
+        <nav
+          aria-label="Primary"
+          className="flex flex-col items-stretch gap-2 border-t border-border pt-2 text-sm lg:flex-row lg:items-center lg:gap-6 lg:border-t-0 lg:pt-0"
+        >
+          <div className="flex min-h-11 items-center justify-between gap-5 lg:min-h-0 lg:gap-6">
+            {navigationLink("/browse", "Browse")}
+            {navigationLink("/about", "About")}
+            <a
+              className="nav-link inline-flex items-center gap-1.5"
+              href={SITE.factGridOrigin}
+              rel="noreferrer"
+              target="_blank"
+            >
+              FactGrid
+              <ExternalLink aria-hidden="true" className="hidden size-3.5 lg:block" />
+            </a>
+          </div>
+          <AuthControl />
         </nav>
-        <AuthControl />
       </div>
-      <nav
-        aria-label="Primary mobile"
-        className="site-container flex min-h-11 items-center gap-6 border-t border-border text-sm md:hidden"
-      >
-        {navigationLink("/browse", "Browse")}
-        {navigationLink("/about", "About")}
-        <a className="nav-link" href={SITE.factGridOrigin} rel="noreferrer" target="_blank">
-          FactGrid
-        </a>
-      </nav>
     </header>
   );
 }

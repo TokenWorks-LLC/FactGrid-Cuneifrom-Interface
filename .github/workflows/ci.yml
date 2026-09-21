@@ -39,3 +39,16 @@ jobs:
       - name: Check the live FactGrid public contract
         continue-on-error: true
         run: npm run test:e2e:live
+
+  docker-runtime:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+      - run: npm run test:docker

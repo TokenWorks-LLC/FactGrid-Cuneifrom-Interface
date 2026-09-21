@@ -53,7 +53,15 @@ export default function AboutPage() {
             source record.
           </p>
 
-          <h2 id="contribution-status">Contribution status</h2>
+          <h2 className="scroll-mt-24" id="sign-in-availability">FactGrid sign-in</h2>
+          <p>
+            If sign-in is marked unavailable, this deployment does not yet have an
+            approved FactGrid OAuth connection. Public browsing remains available.
+            The sign-in entry stays visible and returns here instead of sending you
+            to a failed authorization request.
+          </p>
+
+          <h2 className="scroll-mt-24" id="contribution-status">Contribution status</h2>
           <p>
             Public reading does not require an account. FactGrid sign-in and
             transliteration editing are available only after a FactGrid OAuth

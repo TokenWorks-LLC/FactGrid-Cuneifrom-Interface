@@ -16,17 +16,38 @@ instance with a persistent session volume:
 ```bash
 docker build -t factgrid-cuneiform-interface .
 docker volume create factgrid-cuneiform-sessions
-docker run --rm -p 3000:3000 --env-file .env.production \
+docker run --rm -p 127.0.0.1:3000:3000 --env-file .env.production \
   -e FACTGRID_SESSION_DB_PATH=/data/factgrid-sessions.sqlite \
   -v factgrid-cuneiform-sessions:/data \
   factgrid-cuneiform-interface
 ```
 
+The image runs as the non-root `factgrid` account with UID/GID 1001. An empty
+named volume mounted at `/data` inherits the image directory's UID/GID 1001 and
+mode `0700`; the container starts with `umask 077`, and the session database,
+WAL, and SHM files are mode `0600`. For a bind mount, create the host directory
+in advance, make it writable by UID/GID 1001, and restrict it to mode `0700`.
+Do not work around a permission error with a world-writable directory.
+
+The built-in health check requests the local home page and therefore reports
+whether the Next.js process can serve HTTP; it does not claim that FactGrid or
+OAuth is currently reachable. Treat sanitized 502/503 application responses as
+dependency or configuration failures and inspect container logs without printing
+environment values, cookies, authorization codes, or tokens.
+
 The current session store requires one Node process (or one application instance)
-and a persistent writable volume for `.data/factgrid-sessions.sqlite`. Do not deploy
-editing to an ephemeral or horizontally replicated runtime without first replacing
-the session store with a shared implementation that preserves the same encryption,
-expiry, and deletion properties.
+and a persistent writable database at the configured path (`/data/factgrid-sessions.sqlite`
+in the Docker example, `.data/factgrid-sessions.sqlite` by default for a local Node
+process). Do not deploy editing to an ephemeral or horizontally replicated runtime
+without first replacing the session store with a shared implementation that
+preserves the same encryption, expiry, and deletion properties.
+
+Keep the same mounted volume, `SESSION_SECRET`, and OAuth client configuration
+when replacing the container. A local application session then survives a normal
+replacement. Logout deletes its database row, so revocation also survives later
+replacements. To rotate `SESSION_SECRET`, stop the service and delete the old
+session database before restarting; this intentionally signs everyone out. Never
+attempt to reuse provider tokens encrypted with the previous key.
 
 Use a private persistent directory owned by the application account. On POSIX the
 process forces the SQLite database to mode `0600`; the volume and its WAL sidecars
@@ -44,11 +65,22 @@ The application emits a restrictive CSP plus framing, content-type, referrer,
 permissions, and opener policies. Validate those headers after any proxy or CDN
 change; the proxy must not replace them with weaker values.
 
+Terminate public TLS at a reverse proxy and keep port 3000 private to that proxy.
+Set `APP_ORIGIN` to the exact external HTTPS origin and register
+`${APP_ORIGIN}/api/auth/callback` verbatim. The proxy must replace, rather than
+append untrusted client values to, `Host`, `X-Forwarded-Host`, and
+`X-Forwarded-Proto`; forward the external host and `https`. Production cookies
+are `Secure`, `HttpOnly`, `SameSite=Lax`, path-wide, and high priority, so a
+configured sign-in cannot be tested through direct plain HTTP. Never publish the
+backend port as an alternate sign-in origin.
+
 ## Reading-only deployment
 
 No secrets are required. Leave the OAuth fields empty and
 `FACTGRID_EDITING_ENABLED=false`. `/api/session` returns an unavailable status and
-the interface visibly remains in reading mode. Public FactGrid reads continue.
+the shared desktop/mobile header keeps `Log in with FactGrid` visible with an
+`Unavailable` status. That entry opens an accessible explanation rather than a
+raw API error. Public FactGrid reads continue.
 
 ## Enabling FactGrid sign-in
 
@@ -66,7 +98,11 @@ need separate administrator approval:
    `FACTGRID_SESSION_DB_PATH`.
 
 Restart, confirm `/api/session` is private/no-store, and complete sign-in with a
-non-writing account before considering edits.
+non-writing account before considering edits. A configured anonymous browser is
+sent through the real FactGrid authorization flow and returned only to its
+validated same-origin path. After authentication the header shows the FactGrid
+username and logout. These controls remain available when editing is disabled or
+the account is absent from the editor allowlist.
 
 ## Enabling writes
 
@@ -103,11 +139,21 @@ npm audit --omit=dev
 npm run lint
 npm run typecheck
 npm test
-npx playwright install chromium
+npx playwright install --with-deps chromium # clean Linux host/CI
+npx playwright install chromium             # macOS/Windows
+npm run test:docker
 npm run test:e2e
 npm run test:e2e:live
 npm run build
 ```
+
+The Docker smoke command creates only uniquely named `factgrid-task-*` images,
+containers, networks, and disposable volumes, then removes those exact resources.
+It builds the actual production image and uses a separate, local HTTPS FactGrid
+fixture plus TLS reverse proxy to exercise the real login, callback, session, and
+logout handlers with synthetic credentials. Passing it establishes container and
+fixture-based authentication behavior only; it does not establish that a real
+FactGrid OAuth consumer has been approved or that live FactGrid sign-in works.
 
 The required `test:e2e` check runs the full Next.js application at desktop and
 mobile widths against checked-in adapter fixtures. This keeps homepage, search,
@@ -140,6 +186,12 @@ reports success.
   or session storage could not open. Check names and file permissions, never log secrets.
 - **Sign-in callback rejected:** the request origin/path or state transaction did
   not match. Confirm the exact callback at both FactGrid and the deployment.
+- **OAuth configuration was removed with active sessions:** logout still expires
+  the browser cookie, but cannot confirm deletion of the encrypted server row
+  while the session-store configuration is unavailable. Restore the same secure
+  configuration to revoke it, or rotate `SESSION_SECRET` and remove the session
+  database to invalidate every outstanding session; revoke the FactGrid consumer
+  as well if its credentials may be compromised.
 - **Signed in but no editor:** the feature switch, username allowlist, or target
   allowlist is closed; this is the expected safe default.
 - **409 conflict:** preserve the draft, inspect FactGrid history, reload, and reapply

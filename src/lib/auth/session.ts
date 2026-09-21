@@ -69,7 +69,7 @@ export function setSessionCookie(
 
 export function clearSessionCookie(
   response: NextResponse,
-  configuration: AuthConfiguration,
+  configuration: Pick<AuthConfiguration, "secureCookies">,
 ): void {
   response.cookies.set(SESSION_COOKIE_NAME, "", {
     httpOnly: true,

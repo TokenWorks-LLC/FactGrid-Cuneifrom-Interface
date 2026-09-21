@@ -29,7 +29,12 @@ npm run dev
 ```
 
 Open <http://127.0.0.1:3000>. The default empty OAuth settings intentionally put
-the site in reading mode.
+the site in reading mode. The shared desktop/mobile header still shows
+`Log in with FactGrid`, marked `Unavailable`; it links to an explanation instead
+of a failing API response. With complete OAuth configuration the same entry starts
+the real provider flow and returns to the validated internal page. A signed-in
+account name and logout replace it. Sign-in availability does not imply edit
+permission: editing remains separately switch- and allowlist-gated.
 
 ## Commands
 
@@ -37,6 +42,7 @@ the site in reading mode.
 npm run lint
 npm run typecheck
 npm test
+npm run test:docker
 npm run test:e2e
 npm run test:e2e:live
 npm run build
@@ -50,10 +56,19 @@ network boundary while exercising the real Next.js server and browser UI.
 FactGrid records; upstream availability is reported in CI but does not replace
 or gate the deterministic acceptance suite.
 
+`test:docker` builds and runs the production image, exercises the reading-only
+desktop/mobile interface, and completes an isolated synthetic OAuth session
+through a local TLS reverse proxy. It verifies non-root execution, private
+SQLite/WAL permissions, session survival across container replacement, logout
+survival across a second replacement, and required response headers. It requires
+a running Docker daemon plus the locally installed Playwright Chromium binary;
+it never contacts a live OAuth provider or performs a scholarly write.
+
 Playwright needs Chromium once on a new machine:
 
 ```bash
-npx playwright install chromium
+npx playwright install --with-deps chromium # clean Linux host/CI
+npx playwright install chromium             # macOS/Windows
 ```
 
 ## Documentation

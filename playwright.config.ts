@@ -2,6 +2,8 @@ import { defineConfig, devices } from "@playwright/test";
 
 const localExecutable = process.env.PLAYWRIGHT_EXECUTABLE_PATH;
 const fixturePreload = "--import=./tests/e2e/factgrid-fetch-fixture.mjs";
+const port = process.env.PLAYWRIGHT_PORT ?? "3000";
+const baseURL = `http://localhost:${port}`;
 
 export default defineConfig({
   testDir: "./tests/e2e",
@@ -13,7 +15,7 @@ export default defineConfig({
   retries: process.env.CI ? 1 : 0,
   reporter: process.env.CI ? "github" : "list",
   use: {
-    baseURL: "http://localhost:3000",
+    baseURL,
     ...(localExecutable ? { launchOptions: { executablePath: localExecutable } } : {}),
     trace: "retain-on-failure",
   },
@@ -22,7 +24,7 @@ export default defineConfig({
     { name: "mobile-chromium", use: { ...devices["Pixel 7"] } },
   ],
   webServer: {
-    command: "npm run dev",
+    command: `npm run dev -- -p ${port}`,
     env: {
       ...process.env,
       APP_ORIGIN: "",
@@ -36,10 +38,10 @@ export default defineConfig({
       NODE_OPTIONS: [process.env.NODE_OPTIONS, fixturePreload].filter(Boolean).join(" "),
       SESSION_SECRET: "",
     },
-    url: "http://localhost:3000",
-    // Never reuse a developer server: it would bypass the fixture preload and
-    // make the required suite depend on whichever process owns port 3000.
-    reuseExistingServer: false,
+    url: baseURL,
+    // The required suite never reuses a developer server. An explicit local-only
+    // override lets contributors target a server they started with the same fixtures.
+    reuseExistingServer: process.env.PLAYWRIGHT_REUSE_SERVER === "true",
     timeout: 120_000,
   },
 });

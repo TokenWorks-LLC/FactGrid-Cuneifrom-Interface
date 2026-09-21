@@ -77,13 +77,17 @@ export function EditionEditGate(props: EditionEditGateProps) {
           : `${state.username} is signed in, but is not on this interface’s approved editor list.`;
 
   return (
-    <div className="mt-8 flex gap-3 border-t border-border pt-5 text-sm leading-6 text-muted-foreground">
+    <div className="mt-8 flex scroll-mt-24 gap-3 border-t border-border pt-5 text-sm leading-6 text-muted-foreground">
       <LockKeyhole aria-hidden="true" className="mt-0.5 size-4 shrink-0" />
       <p>
         {message}{" "}
         {state.status === "anonymous" ? (
           <a className="font-medium text-foreground underline underline-offset-4" href={`/api/auth/login?returnTo=${encodeURIComponent(`/tablets/${props.qid}`)}`}>
-            Sign in
+            Log in with FactGrid
+          </a>
+        ) : state.status === "unavailable" ? (
+          <a className="font-medium text-foreground underline underline-offset-4" href="/about#sign-in-availability">
+            Learn about sign-in availability
           </a>
         ) : null}
       </p>
