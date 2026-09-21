@@ -4,7 +4,10 @@ const localExecutable = process.env.PLAYWRIGHT_EXECUTABLE_PATH;
 
 export default defineConfig({
   testDir: "./tests/e2e",
-  fullyParallel: true,
+  // The two live FactGrid journeys are intentionally serialized in CI so the
+  // public upstream is not hit by four desktop/mobile requests at once.
+  fullyParallel: !process.env.CI,
+  workers: process.env.CI ? 1 : undefined,
   forbidOnly: Boolean(process.env.CI),
   retries: process.env.CI ? 1 : 0,
   reporter: process.env.CI ? "github" : "list",

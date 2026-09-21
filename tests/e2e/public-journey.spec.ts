@@ -47,7 +47,7 @@ test("mobile navigation and primary search remain operable", async ({ page }, te
 });
 
 test("live catalogue search opens the multi-edition Prag record", async ({ page }) => {
-  test.setTimeout(30_000);
+  test.setTimeout(60_000);
 
   await page.goto("/browse?q=Prag+I+437");
   await page.getByLabel("Collection / holding").selectOption("Q512014");
@@ -64,7 +64,7 @@ test("live catalogue search opens the multi-edition Prag record", async ({ page 
 });
 
 test("plain Transcript-section poems remain readable", async ({ page }) => {
-  test.setTimeout(30_000);
+  test.setTimeout(60_000);
 
   await page.goto("/tablets/Q1089841");
 
