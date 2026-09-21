@@ -10,15 +10,27 @@ npm run check
 npm start
 ```
 
+The repository also includes a production `Dockerfile`. Build and run one
+instance with a persistent session volume:
+
+```bash
+docker build -t factgrid-cuneiform-interface .
+docker volume create factgrid-cuneiform-sessions
+docker run --rm -p 3000:3000 --env-file .env.production \
+  -e FACTGRID_SESSION_DB_PATH=/data/factgrid-sessions.sqlite \
+  -v factgrid-cuneiform-sessions:/data \
+  factgrid-cuneiform-interface
+```
+
 The current session store requires one Node process (or one application instance)
 and a persistent writable volume for `.data/factgrid-sessions.sqlite`. Do not deploy
 editing to an ephemeral or horizontally replicated runtime without first replacing
 the session store with a shared implementation that preserves the same encryption,
 expiry, and deletion properties.
 
-Use a private persistent directory owned by the application account. The process
-forces the SQLite database to mode `0600`; the volume and its WAL sidecars must
-also be inaccessible to other accounts. Configure HSTS at the TLS terminator.
+Use a private persistent directory owned by the application account. On POSIX the
+process forces the SQLite database to mode `0600`; the volume and its WAL sidecars
+must also be inaccessible to other accounts. Configure HSTS at the TLS terminator.
 
 Public reading needs outbound HTTPS access to `database.factgrid.de`; the homepage
 also loads its attributed image from Wikimedia Commons. Keep the reverse proxy’s
@@ -40,7 +52,9 @@ the interface visibly remains in reading mode. Public FactGrid reads continue.
 
 ## Enabling FactGrid sign-in
 
-A FactGrid administrator must register and approve a confidential OAuth 2 client:
+A FactGrid `sysop` must register and approve a confidential, non-owner-only OAuth
+2 client. Other FactGrid accounts can authorize it after approval; they do not
+need separate administrator approval:
 
 1. use authorization-code and refresh-token grants;
 2. request the minimum `editpage` grant plus provider-required basic access;
@@ -72,6 +86,13 @@ editor policy and a designated test record first.
 The service checks live identity, rights, blocks, page protections, target linkage,
 source format, and base revision for each request. An empty allowlist denies writes.
 
+Application logout removes the local application session. It does not revoke the
+provider grant; users can revoke that separately from FactGrid's connected-
+applications management page. If local session storage fails during logout, the
+browser cookie is still cleared and the UI reports that server-side revocation
+could not be confirmed. The user should then revoke the connected application in
+FactGrid so any orphaned provider token can no longer be used.
+
 ## Verification
 
 For each release:
@@ -90,6 +111,15 @@ npm run build
 Then smoke-test `/`, `/about`, `/browse`, one sparse tablet, and one multi-edition
 tablet at desktop and mobile widths. Treat a FactGrid timeout as an upstream error,
 not an empty catalogue.
+
+For configured authentication, sign in, restart the same process/container with
+the same mounted volume, and confirm the session survives. Confirm the database,
+WAL, and SHM files are accessible only to the application account. At the reverse
+proxy, verify the external origin exactly matches `APP_ORIGIN`, callbacks remain
+HTTPS, private API responses keep `Cache-Control: private, no-store`, and security
+headers are not weakened. A confirmed changed live write must read back the exact
+revision, full source, FactGrid username/user ID, and edit summary before the UI
+reports success.
 
 ## Troubleshooting
 

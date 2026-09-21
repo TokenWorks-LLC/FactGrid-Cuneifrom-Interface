@@ -10,10 +10,10 @@ The MVP provides:
 - stable QID-based record pages with metadata, source-separated editions, image links, and external transcript links;
 - safe plain-text display of supported FactGrid document pages;
 - FactGrid OAuth 2 authorization-code sign-in with PKCE and server-side sessions;
-- a deliberately narrow editor for verified plain `D-Q…` transcript regions;
+- a deliberately narrow editor for one verified plain `D-Q…` transcript region;
 - fail-closed editing when OAuth, editor policy, or target allowlists are absent.
 
-OAuth and live writes are implemented and fixture-tested, but are not configured
+OAuth and live writes are implemented and contract-tested, but are not configured
 or claimed as live-verified. They require a FactGrid-approved OAuth consumer, an
 approved editor policy, and a designated write-test record. Public reading works
 without authentication.
@@ -70,3 +70,11 @@ FactGrid structured data is CC0. Linked publications and images retain their own
 terms. The homepage photograph is “Cuneiform tablet and envelope, MAHG 16161” by
 Rama, offered under CC BY-SA 3.0 France; its Commons file page is linked beside
 the image.
+
+## Current verification boundary
+
+A read-only coverage check on 21 September 2026 found two format-compatible plain
+D transcripts among all five current exact D-Q candidates. Both remain ineligible
+for writes in the default configuration because editing and the exact editor/target
+allowlists are closed. See the contract document for complete structured-property
+counts, bounded content samples, and the remaining read-only source families.

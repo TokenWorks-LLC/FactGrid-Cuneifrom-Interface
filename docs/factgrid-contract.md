@@ -1,6 +1,6 @@
 # Verified FactGrid contract
 
-The contract below was checked read-only against FactGrid on 20 September 2026.
+The contract below was checked read-only against FactGrid on 21 September 2026.
 It intentionally records uncertainty and avoids turning observed conventions into
 universal guarantees.
 
@@ -70,17 +70,47 @@ mixed scholarly D pages, token-level CDLI/ORACC material, Unicode glyph pages,
 CoNLL-U corpora, and missing pages.
 
 The MVP reads a bounded set of linked pages and identifies editions separately.
-Reading also recognizes one unambiguous plain `<poem>` inside a Transcript or
-Transliteration section. Without the exact `hasTransliteration` RDFa property it
-remains read-only. Editing is restricted to an exact FactGrid-hosted `D-Q{qid}`
-page whose current wikitext contains exactly one property-marked poem region with
-neither structural wikitext nor structured token rows. Every other format is
-read-only. The content outside the recognized region is preserved byte-for-byte.
+Reading also recognizes one unambiguous plain `<poem>` inside an exact Transcript
+or Transliteration section. Editing is restricted to an exact FactGrid-hosted
+`D-Q{qid}` page whose current wikitext has one plain region identified either by
+the exact `hasTransliteration` RDFa property or by that unique named-section rule.
+Structural wikitext and structured token rows remain read-only. The current P251
+statement, stable statement ID, exact deployment target allowlist, and all account
+checks are still required. Content outside the recognized region is preserved
+byte-for-byte.
 Document preamble and other headed sections are exposed as source notes where
 they reduce to safe readable text.
 
 P69 links are never scraped or imported. Sampled OARE P69 links returned 404 at
 investigation time, so the UI labels them neutrally and does not promise availability.
+
+## Coverage measurement
+
+The following structured-property counts are complete for the current FactGrid
+tablet class at the time checked; source-content classification is identified
+separately where it is sampled.
+
+- 152,633 tablet items were counted.
+- 1,472 items had P251, comprising 1,475 distinct local statements/references.
+- 18 items had P69; one also had P251, leaving 17 external-only items.
+- 151,144 items had neither P251 nor P69.
+- P251 titles comprised 1,464 exact `CoNLL-U-QID`, five exact `D-QID`, two
+  `CDLI-W`, one `ORACC-W`, one `UNICODE-W`, and two other same-QID titles.
+
+Content compatibility is not inferred from those totals. A bounded first-100
+P251-row content sample contained 99 structured CoNLL-U pages and the plain
+`D-Q1089841` page. A separate exhaustive check of all five exact D-Q candidates
+found two plain, uniquely sectioned pages (`D-Q1089841` and `D-Q894369`) and three
+property-marked but mixed-wikitext pages (`D-Q499899`, `D-Q1897737`, and
+`D-Q1897738`). The two plain pages are format-compatible with the narrow editor;
+the other D pages and the structured families remain read-only. Known missing
+pages such as `CDLI-Q499894` and `CDLI-W-Q1371532` remain explicit source
+exceptions rather than false empty transcripts.
+
+Format compatibility is not permission eligibility. With the checked default
+configuration, **0 sources are permission-eligible** because editing is disabled
+and the editor and exact target allowlists are empty. A compatible D source becomes
+eligible only after project approval and an exact QID/title allowlist entry.
 
 ## Images and rights
 
@@ -96,8 +126,11 @@ authorization code, refresh tokens, bearer-authenticated API calls, PKCE, profil
 fields, and edit grants. The minimum requested project grant is `editpage`; identity-
 only access cannot write through the Action API.
 
-Only a FactGrid administrator can register/approve this consumer on the current
-instance. No published cuneiform-specific editor policy was found. Consequently,
+The current user-group response assigns both OAuth consumer registration/proposal
+and approval rights only to `sysop`, so a FactGrid administrator must perform both
+actions. An approved non-owner-only consumer can then be authorized by other
+FactGrid accounts without per-user administrator action. No published cuneiform-
+specific editor policy was found. Consequently,
 the application additionally requires a deployment-maintained exact username
 allowlist and exact target allowlist, and editing defaults to disabled.
 

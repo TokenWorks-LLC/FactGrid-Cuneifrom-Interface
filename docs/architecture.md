@@ -52,9 +52,9 @@ Provider access and refresh tokens are encrypted at rest in a minimal SQLite
 session table; opaque session identifiers are stored only as hashes. Cookies are
 SameSite=Lax, scoped to `/`, and Secure in production. Sessions expire and are
 deleted on logout. A new login revokes the prior session for the same FactGrid
-identity, active rows are capped, and the database file is forced to owner-only
-permissions. The SQLite file is operational session state, not a catalogue or
-account database.
+identity, active rows are capped, and on POSIX the database file is forced to
+owner-only permissions. The SQLite file is operational session state, not a
+catalogue or account database.
 
 This design expects one application instance with a persistent writable volume.
 Multiple replicas require a shared session-store implementation, which is outside
@@ -73,12 +73,16 @@ Before one non-retried `action=edit` request, the service verifies:
 - a live, refreshed provider session and fresh FactGrid identity, block, and edit-right state;
 - current P251 membership and its exact fixed-host document title;
 - existing wikitext page, page protection/action eligibility, expected base revision,
-  and one supported plain `D-Q…` transcript region;
+  and one supported plain `D-Q…` transcript region, identified either by the
+  exact transliteration RDFa property or by a unique poem in an exact Transcript
+  or Transliteration section;
 - bounded UTF-8 input with no structural wiki markup or forged poem boundary.
 
 The adapter splices only the transcript byte range and preserves every byte outside
 it. FactGrid receives `nocreate`, revision conflict parameters, and an edit summary.
-The service then reads the saved revision back and confirms both revision and text.
+The service then reads the saved revision back and confirms the revision and
+complete source text. For a changed save it also confirms the FactGrid username,
+user ID attribution, and effective edit summary.
 Network failures after submission are reported as an ambiguous outcome and are not
 blindly retried.
 

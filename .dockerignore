@@ -1,0 +1,14 @@
+.git
+.github
+.next
+.data
+.env
+.env.*
+!.env.example
+.node_modules.*
+node_modules
+npm-debug.log*
+playwright-report
+test-results
+coverage
+FACTGRID_CUNEIFORM_IMPLEMENTATION_HANDOFF.md
