@@ -10,6 +10,7 @@ type State =
   | { status: "target-denied" }
   | { status: "unavailable" }
   | { status: "anonymous" }
+  | { status: "editing-disabled" }
   | { status: "denied"; username: string }
   | { status: "allowed"; csrfToken: string };
 
@@ -37,10 +38,12 @@ export function EditionEditGate(props: EditionEditGateProps) {
         const body = (await response.json()) as {
           authenticated?: boolean;
           csrfToken?: string;
+          editingEnabled?: boolean;
           editorApproved?: boolean;
           user?: { username?: string };
         };
         if (!body.authenticated) return { status: "anonymous" } as const;
+        if (body.editingEnabled === false) return { status: "editing-disabled" } as const;
         if (!body.editorApproved || !body.csrfToken) {
           return { status: "denied", username: body.user?.username ?? "this account" } as const;
         }
@@ -67,6 +70,8 @@ export function EditionEditGate(props: EditionEditGateProps) {
       ? "This document is readable, but it is not on this deployment’s approved edit-target list."
       : state.status === "unavailable"
         ? "Editing is not configured for this deployment. Reading and source links remain available."
+        : state.status === "editing-disabled"
+          ? "Editing is currently disabled for this deployment. Reading and source links remain available."
         : state.status === "anonymous"
           ? "Sign in with FactGrid to check whether this edition can be edited."
           : `${state.username} is signed in, but is not on this interface’s approved editor list.`;

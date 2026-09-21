@@ -8,7 +8,7 @@ import { TranscriptEditError } from "./errors";
 // escape quotes and backslashes. The transcript itself is checked separately.
 export const MAX_WRITE_BODY_BYTES = FACTGRID_LIMITS.maxTranscriptBytes * 2 + 8_192;
 
-const CONTROL_CHARACTERS_EXCEPT_TAB = /[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/u;
+const CONTROL_CHARACTERS = /[\u0000-\u001f\u007f]/u;
 
 export const transcriptWriteSchema = z
   .object({
@@ -17,7 +17,7 @@ export const transcriptWriteSchema = z
     summary: z
       .string()
       .max(255)
-      .refine((value) => !CONTROL_CHARACTERS_EXCEPT_TAB.test(value), {
+      .refine((value) => !CONTROL_CHARACTERS.test(value), {
         message: "Edit summary contains unsupported control characters.",
       })
       .refine((value) => Buffer.byteLength(value, "utf8") <= 500, {

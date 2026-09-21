@@ -57,6 +57,17 @@ describe("parseTranscriptWriteRequest", () => {
     ).rejects.toBeInstanceOf(TranscriptEditError);
   });
 
+  it.each(["line one\nline two", "line one\rline two", "line one\tline two"])(
+    "rejects control characters in edit summaries",
+    async (summary) => {
+      await expect(
+        parseTranscriptWriteRequest(
+          jsonRequest({ baseRevision: 42, text: "transcript", summary }),
+        ),
+      ).rejects.toMatchObject({ code: "invalid_request", status: 400 });
+    },
+  );
+
   it("enforces the byte limit before trusting Content-Length", async () => {
     await expect(
       parseTranscriptWriteRequest(

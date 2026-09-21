@@ -73,6 +73,8 @@ export interface EditableEditionSnapshot {
   transcript: TranscriptRegion;
   csrfToken: string;
   requestStartedAt: string;
+  expectedUsername: string;
+  expectedUserId: string;
 }
 
 export interface SavedTranscript {
@@ -433,6 +435,8 @@ export function createMediaWikiEditClient(
       transcript: revision.transcript,
       csrfToken,
       requestStartedAt: response.curtimestamp,
+      expectedUsername: identity.username,
+      expectedUserId: identity.providerUserId,
     };
   }
 
@@ -494,7 +498,7 @@ export function createMediaWikiEditClient(
         formatversion: "2",
         prop: "revisions",
         rvlimit: "1",
-        rvprop: "ids|timestamp|content|contentmodel",
+        rvprop: "ids|timestamp|user|userid|comment|content|contentmodel",
         rvslots: "main",
         titles: title,
       },
@@ -580,6 +584,18 @@ export function createMediaWikiEditClient(
       throw new TranscriptEditError(
         "save_confirmation_failed",
         "FactGrid accepted the edit, but the current page no longer matches it. Check page history before editing again.",
+        { status: 409 },
+      );
+    }
+    if (
+      !response.edit.nochange &&
+      (revision.user !== snapshot.expectedUsername ||
+        String(revision.userid) !== snapshot.expectedUserId ||
+        revision.comment !== summary)
+    ) {
+      throw new TranscriptEditError(
+        "save_confirmation_failed",
+        "FactGrid accepted the edit, but its attribution or summary could not be confirmed. Check page history before editing again.",
         { status: 409 },
       );
     }

@@ -13,6 +13,23 @@ import type { SessionStore, SessionSummary } from "@/lib/auth/session-store";
 
 export const runtime = "nodejs";
 
+function sessionRevocationUnavailable(
+  configuration: Parameters<typeof clearSessionCookie>[1],
+): NextResponse {
+  const response = privateJson(
+    {
+      error: {
+        code: "session_unavailable",
+        message:
+          "The browser credential was cleared, but the server session could not be revoked. Revoke the connected application in FactGrid if needed.",
+      },
+    },
+    { status: 503 },
+  );
+  clearSessionCookie(response, configuration);
+  return response;
+}
+
 export async function POST(request: NextRequest): Promise<NextResponse> {
   const result = getAuthConfiguration();
   if (!result.available) return authUnavailable();
@@ -36,15 +53,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     store = getSessionStore(result.config);
     session = store.getSummary(token);
   } catch {
-    return privateJson(
-      {
-        error: {
-          code: "session_unavailable",
-          message: "The session service is temporarily unavailable.",
-        },
-      },
-      { status: 503 },
-    );
+    return sessionRevocationUnavailable(result.config);
   }
   if (session && !hasValidCsrfToken(request, session.csrfToken, CSRF_HEADER_NAME)) {
     return privateJson(
@@ -58,7 +67,11 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     );
   }
 
-  store.delete(token);
+  try {
+    store.delete(token);
+  } catch {
+    return sessionRevocationUnavailable(result.config);
+  }
   const response = new NextResponse(null, { status: 204 });
   clearSessionCookie(response, result.config);
   return noStore(response);

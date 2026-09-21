@@ -358,7 +358,7 @@ function EditionSection({
                   {readOnlyReason}
                 </p>
               ) : null}
-              <pre className="transcript-text mt-4 border border-border bg-card p-5 text-sm leading-7 whitespace-pre-wrap sm:p-7">
+              <pre className="transcript-text mt-4 overflow-x-auto border border-border bg-card p-5 text-sm leading-7 break-words whitespace-pre-wrap sm:p-7">
                 {wikitextToPlainText(transcript.displayText) ||
                   "The recognized transcript region is empty."}
               </pre>

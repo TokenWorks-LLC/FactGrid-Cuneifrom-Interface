@@ -17,13 +17,14 @@ type SessionStatus =
 export function AuthControl() {
   const router = useRouter();
   const [session, setSession] = useState<SessionStatus>({ status: "loading" });
+  const [logoutError, setLogoutError] = useState<string | null>(null);
 
   useEffect(() => {
     const controller = new AbortController();
     fetch("/api/session", { cache: "no-store", signal: controller.signal })
       .then(async (response) => {
         if (response.status === 503) return { status: "unavailable" } as const;
-        if (!response.ok) return { status: "anonymous" } as const;
+        if (!response.ok) return { status: "unavailable" } as const;
         const body = (await response.json()) as {
           authenticated?: boolean;
           csrfToken?: string;
@@ -40,7 +41,7 @@ export function AuthControl() {
       .then(setSession)
       .catch((error: unknown) => {
         if (error instanceof DOMException && error.name === "AbortError") return;
-        setSession({ status: "anonymous" });
+        setSession({ status: "unavailable" });
       });
     return () => controller.abort();
   }, []);
@@ -65,19 +66,37 @@ export function AuthControl() {
     return (
       <div className="flex items-center gap-2">
         <span className="hidden max-w-28 truncate text-sm font-medium sm:inline">{session.username}</span>
+        {logoutError ? (
+          <span className="max-w-48 text-xs leading-4 text-destructive" id="logout-error" role="alert">
+            {logoutError}
+          </span>
+        ) : null}
         <button
+          aria-describedby={logoutError ? "logout-error" : undefined}
           className={cn(
             buttonVariants({ size: "sm", variant: "outline" }),
             "min-h-11 rounded-none px-3",
           )}
           onClick={async () => {
-            const response = await fetch("/api/auth/logout", {
-              method: "POST",
-              headers: { "X-CSRF-Token": session.csrfToken },
-            });
-            if (response.ok) {
-              router.push("/");
-              router.refresh();
+            setLogoutError(null);
+            try {
+              const response = await fetch("/api/auth/logout", {
+                method: "POST",
+                headers: { "X-CSRF-Token": session.csrfToken },
+              });
+              if (response.ok) {
+                router.push("/");
+                router.refresh();
+                return;
+              }
+              const body = (await response.json().catch(() => ({}))) as {
+                error?: { message?: string };
+              };
+              setLogoutError(
+                body.error?.message ?? "Sign-out could not be confirmed. Please try again.",
+              );
+            } catch {
+              setLogoutError("Sign-out could not be confirmed. Please try again.");
             }
           }}
           type="button"

@@ -35,7 +35,11 @@ function json(body: unknown, status = 200): Response {
   return Response.json(body, { status });
 }
 
-function page(revisionId: number, content: string) {
+function page(
+  revisionId: number,
+  content: string,
+  attribution: { user?: string; userid?: number; comment?: string } = {},
+) {
   return {
     pageid: 123,
     ns: 0,
@@ -48,6 +52,9 @@ function page(revisionId: number, content: string) {
         revid: revisionId,
         parentid: revisionId - 1,
         timestamp: "2026-09-20T10:00:00Z",
+        user: attribution.user ?? "Editor",
+        userid: attribution.userid ?? 17,
+        comment: attribution.comment ?? "Correct line",
         slots: {
           main: {
             contentmodel: "wikitext",
@@ -128,6 +135,8 @@ describe("FactGrid MediaWiki transcript writes", () => {
     expect(form.get("starttimestamp")).toBe("2026-09-20T10:01:00Z");
     expect(form.get("summary")).toBe("Correct line");
     expect(calls[2].init?.cache).toBe("no-store");
+    expect(calls[2].input.searchParams.get("rvprop")).toContain("user");
+    expect(calls[2].input.searchParams.get("rvprop")).toContain("comment");
   });
 
   it("returns a 409 before writing when the browser revision is stale", async () => {
@@ -247,6 +256,80 @@ describe("FactGrid MediaWiki transcript writes", () => {
         summary: "",
       }),
     ).rejects.toMatchObject({ code: "save_confirmation_failed", status: 409 });
+    expect(calls).toBe(3);
+  });
+
+  it.each([
+    ["attribution", { user: "OtherEditor" }],
+    ["user ID", { userid: 99 }],
+    ["summary", { comment: "Different summary" }],
+  ])("does not report success when readback %s differs", async (_label, attribution) => {
+    let calls = 0;
+    const fetchMock: typeof fetch = async () => {
+      calls += 1;
+      if (calls === 1) return json(inspection());
+      if (calls === 2) {
+        return json({
+          edit: {
+            result: "Success",
+            title: "D-Q42",
+            newrevid: 101,
+          },
+        });
+      }
+      return json({
+        query: { pages: [page(101, updatedSource, attribution)] },
+      });
+    };
+    const client = createMediaWikiEditClient({ fetch: fetchMock });
+    const snapshot = await inspected(client);
+
+    await expect(
+      client.submitEdit("access-token", snapshot, {
+        baseRevision: 100,
+        text: "new line\nša",
+        summary: "Correct line",
+      }),
+    ).rejects.toMatchObject({ code: "save_confirmation_failed", status: 409 });
+    expect(calls).toBe(3);
+  });
+
+  it("confirms an unchanged save without inventing new attribution or summary", async () => {
+    let calls = 0;
+    const fetchMock: typeof fetch = async () => {
+      calls += 1;
+      if (calls === 1) return json(inspection());
+      if (calls === 2) {
+        return json({
+          edit: {
+            result: "Success",
+            title: "D-Q42",
+            nochange: true,
+          },
+        });
+      }
+      return json({
+        query: {
+          pages: [
+            page(100, source, {
+              user: "OriginalEditor",
+              userid: 3,
+              comment: "Original summary",
+            }),
+          ],
+        },
+      });
+    };
+    const client = createMediaWikiEditClient({ fetch: fetchMock });
+    const snapshot = await inspected(client);
+
+    await expect(
+      client.submitEdit("access-token", snapshot, {
+        baseRevision: 100,
+        text: "\r\nold line\r\n",
+        summary: "No material change",
+      }),
+    ).resolves.toEqual({ revisionId: 100, text: "\r\nold line\r\n" });
     expect(calls).toBe(3);
   });
 

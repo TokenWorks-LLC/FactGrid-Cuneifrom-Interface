@@ -50,28 +50,65 @@ function hasTransliterationProperty(openingTag: string): boolean {
 }
 
 function isInsideExcludedWikitextContext(source: string, index: number): boolean {
-  const prefix = source.slice(0, index).toLowerCase();
+  const context = source.slice(0, index);
+  const prefix = context.toLowerCase();
+  const insideTag = (tag: string) => {
+    const tokens = context.matchAll(new RegExp(`<\\/?${tag}\\b[^>]*>`, "giu"));
+    let depth = 0;
+    for (const token of tokens) {
+      if (/^<\//u.test(token[0])) depth = Math.max(0, depth - 1);
+      else if (!/\/\s*>$/u.test(token[0])) depth += 1;
+    }
+    return depth > 0;
+  };
   return (
     prefix.lastIndexOf("<!--") > prefix.lastIndexOf("-->") ||
-    prefix.lastIndexOf("<nowiki") > prefix.lastIndexOf("</nowiki")
+    [
+      "nowiki",
+      "ref",
+      "gallery",
+      "table",
+      "tbody",
+      "thead",
+      "tr",
+      "td",
+      "th",
+      "div",
+      "script",
+      "style",
+      "iframe",
+      "object",
+      "embed",
+      "form",
+      "textarea",
+    ].some(insideTag) ||
+    prefix.lastIndexOf("{{") > prefix.lastIndexOf("}}") ||
+    prefix.lastIndexOf("[[") > prefix.lastIndexOf("]]") ||
+    prefix.lastIndexOf("{|") > prefix.lastIndexOf("|}")
   );
 }
 
-function isInsideTranscriptSection(source: string, index: number): boolean {
+function isDirectlyInsideTranscriptSection(source: string, index: number): boolean {
   const headingPattern = /^(={2,6})\s*([^\r\n=].*?)\s*\1\s*$/gm;
   const headings = Array.from(source.matchAll(headingPattern));
   return headings.some((heading, headingIndex) => {
     if (!/^transcript(?:ion)?$|^transliteration$/iu.test(heading[2].trim())) return false;
     const start = (heading.index ?? 0) + heading[0].length;
     const end = headings[headingIndex + 1]?.index ?? source.length;
-    return index >= start && index < end;
+    return (
+      !isInsideExcludedWikitextContext(source, heading.index ?? -1) &&
+      index >= start &&
+      index < end &&
+      /^\s*$/u.test(source.slice(start, index))
+    );
   });
 }
 
 /**
  * Finds one exact hasTransliteration poem boundary, or one unambiguous poem in
- * a Transcript/Transliteration section for read-only display. Only the exact
- * RDFa property form can become editable.
+ * a Transcript/Transliteration section. A verified D page can be editable when
+ * either marker identifies one plain region; every write still requires the
+ * current exact P251 statement and deployment target allowlist.
  */
 export function analyzeTranscriptSource(
   reference: DocumentReference,
@@ -90,7 +127,7 @@ export function analyzeTranscriptSource(
       ? attributedOpenings[0]
       : attributedOpenings.length === 0 &&
           eligibleOpenings.length === 1 &&
-          isInsideTranscriptSection(source, eligibleOpenings[0].index ?? -1)
+          isDirectlyInsideTranscriptSection(source, eligibleOpenings[0].index ?? -1)
         ? eligibleOpenings[0]
         : undefined;
   if (!opening) return null;
@@ -105,12 +142,19 @@ export function analyzeTranscriptSource(
   const structured = STRUCTURED_TRANSCRIPT_ROWS.test(content);
   const verifiedEditionKind = reference.kind === "d";
   const verifiedProperty = hasTransliterationProperty(opening[0]);
+  const verifiedSection =
+    eligibleOpenings.length === 1 &&
+    isDirectlyInsideTranscriptSection(source, opening.index ?? -1);
 
   return {
     format: mixed ? "mixed-wikitext" : structured ? "structured-lines" : "plain-poem-v1",
     content,
     displayText: content.trim(),
-    editable: !mixed && !structured && verifiedEditionKind && verifiedProperty,
+    editable:
+      !mixed &&
+      !structured &&
+      verifiedEditionKind &&
+      (verifiedProperty || verifiedSection),
     start,
     end: closing.index,
     reason: mixed
@@ -119,8 +163,8 @@ export function analyzeTranscriptSource(
         ? "This token-column transcript is read-only."
         : !verifiedEditionKind
           ? "Only verified plain D-Q document pages are supported for editing."
-          : !verifiedProperty
-            ? "This poem is readable, but it lacks the verified hasTransliteration property required for editing."
+          : !verifiedProperty && !verifiedSection
+            ? "This poem is readable, but it is not uniquely identified by a transliteration marker or section."
             : undefined,
   };
 }

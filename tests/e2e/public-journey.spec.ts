@@ -46,8 +46,7 @@ test("mobile navigation and primary search remain operable", async ({ page }, te
   await expect(page.getByRole("search")).toBeVisible();
 });
 
-test("live catalogue search opens the multi-edition Prag record", async ({ page }, testInfo) => {
-  test.skip(testInfo.project.name.includes("mobile"), "Desktop live-data acceptance path");
+test("live catalogue search opens the multi-edition Prag record", async ({ page }) => {
   test.setTimeout(30_000);
 
   await page.goto("/browse?q=Prag+I+437");
@@ -64,12 +63,14 @@ test("live catalogue search opens the multi-edition Prag record", async ({ page 
   await expect(page.getByRole("navigation", { name: "Edition index" })).toBeVisible();
 });
 
-test("plain Transcript-section poems remain readable", async ({ page }, testInfo) => {
-  test.skip(testInfo.project.name.includes("mobile"), "Desktop live-data acceptance path");
+test("plain Transcript-section poems remain readable", async ({ page }) => {
   test.setTimeout(30_000);
 
   await page.goto("/tablets/Q1089841");
 
   await expect(page.getByText("ap-pa-tu", { exact: false }).first()).toBeVisible();
-  await expect(page.getByText(/lacks the verified hasTransliteration property/)).toBeVisible();
+  await expect(page.getByText(/not on this deployment.*approved edit-target list/)).toBeVisible();
+  expect(
+    await page.locator("html").evaluate((element) => element.scrollWidth <= element.clientWidth),
+  ).toBe(true);
 });

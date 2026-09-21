@@ -153,20 +153,54 @@ P123:obverse.1.1\ta-na
     });
   });
 
-  it("reads one plain poem in a Transcript section but keeps it read-only without RDFa", () => {
+  it("edits one plain poem in an exact Transcript section without requiring RDFa", () => {
     const source = `Bibliographic preamble\n\n== Transcript ==\n<poem>\n@tablet\nap-pa-tu\n</poem>\n`;
+    const region = analyzeTranscriptSource(reference, source)!;
+    const replacement = "\n@tablet\nap-pa-tum\n";
 
-    expect(analyzeTranscriptSource(reference, source)).toMatchObject({
+    expect(region).toMatchObject({
       content: "\n@tablet\nap-pa-tu\n",
       format: "plain-poem-v1",
-      editable: false,
-      reason: expect.stringMatching(/hasTransliteration/),
+      editable: true,
     });
+    const result = spliceTranscriptSource(source, region, replacement);
+    expect(result.slice(0, region.start)).toBe(source.slice(0, region.start));
+    expect(result.slice(region.start + replacement.length)).toBe(source.slice(region.end));
     expect(parseWikitextSections(source)[0]).toMatchObject({
       heading: "Source notes",
       wikitext: "Bibliographic preamble",
     });
     expect(parseWikitextSections(source)[0].wikitext).not.toContain("ap-pa-tu");
+  });
+
+  it("rejects a stale Transcript-section boundary instead of splicing changed source", () => {
+    const source = `== Transcript ==\n<poem>\nap-pa-tu\n</poem>\n`;
+    const region = analyzeTranscriptSource(reference, source)!;
+    const changed = source.replace("ap-pa-tu", "changed elsewhere");
+
+    expect(() => spliceTranscriptSource(changed, region, "replacement")).toThrow(
+      /source no longer matches/i,
+    );
+  });
+
+  it.each([
+    `<!--\n== Transcript ==\n-->\n<poem>plain text</poem>`,
+    `<nowiki>\n== Transcript ==\n</nowiki>\n<poem>plain text</poem>`,
+    `== Transcript ==\n<ref><poem>citation text</poem></ref>`,
+    `<ref>\n== Transcript ==\n<poem>citation text</poem>\n</ref>`,
+    `{{Template|content=\n== Transcript ==\n<poem>template text</poem>\n}}`,
+    `<gallery>\n== Transcript ==\n<poem>gallery text</poem>\n</gallery>`,
+  ])("does not target a markerless poem through a hidden or wrapped heading", (source) => {
+    expect(analyzeTranscriptSource(reference, source)).toBeNull();
+  });
+
+  it("allows the page-level tablet span and ignores a prior self-closing reference", () => {
+    const source = `<span about="https://database.factgrid.de/entity/Q9000002">\n<ref name="source" />\n== Transcript ==\n<poem>\nplain text\n</poem>\n</span>`;
+
+    expect(analyzeTranscriptSource(reference, source)).toMatchObject({
+      editable: true,
+      content: "\nplain text\n",
+    });
   });
 
   it("rejects forged poem boundaries in replacement text", () => {

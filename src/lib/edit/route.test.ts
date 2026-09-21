@@ -70,6 +70,19 @@ function request(): Parameters<typeof PUT>[0] {
   }) as Parameters<typeof PUT>[0];
 }
 
+function authenticatedSession() {
+  mocks.readSessionToken.mockReturnValue("opaque-session");
+  mocks.getUsableProviderSession.mockResolvedValue({
+    providerUserId: "17",
+    username: "Editor",
+    accessToken: "provider-token",
+    refreshToken: null,
+    accessTokenExpiresAt: null,
+    expiresAt: Date.now() + 60_000,
+    csrfToken: "browser-csrf",
+  });
+}
+
 describe("transcript write route authorization", () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -90,17 +103,33 @@ describe("transcript write route authorization", () => {
     expect(mocks.saveTranscript).not.toHaveBeenCalled();
   });
 
-  it("denies a signed-in user outside the explicit editor policy", async () => {
-    mocks.readSessionToken.mockReturnValue("opaque-session");
-    mocks.getUsableProviderSession.mockResolvedValue({
-      providerUserId: "17",
-      username: "Editor",
-      accessToken: "provider-token",
-      refreshToken: null,
-      accessTokenExpiresAt: null,
-      expiresAt: Date.now() + 60_000,
-      csrfToken: "browser-csrf",
+  it("rejects a write from a foreign origin before reading a session", async () => {
+    mocks.isSameOriginRequest.mockReturnValue(false);
+
+    const response = await PUT(request(), context);
+
+    expect(response.status).toBe(403);
+    expect(await response.json()).toMatchObject({ error: { code: "invalid_origin" } });
+    expect(mocks.readSessionToken).not.toHaveBeenCalled();
+    expect(mocks.saveTranscript).not.toHaveBeenCalled();
+  });
+
+  it("rejects a write with an invalid application CSRF token", async () => {
+    authenticatedSession();
+    mocks.hasValidCsrfToken.mockReturnValue(false);
+
+    const response = await PUT(request(), context);
+
+    expect(response.status).toBe(403);
+    expect(await response.json()).toMatchObject({
+      error: { code: "invalid_csrf_token" },
     });
+    expect(mocks.fetchFactGridProfile).not.toHaveBeenCalled();
+    expect(mocks.saveTranscript).not.toHaveBeenCalled();
+  });
+
+  it("denies a signed-in user outside the explicit editor policy", async () => {
+    authenticatedSession();
     mocks.isApprovedEditor.mockReturnValue(false);
 
     const response = await PUT(request(), context);
@@ -113,17 +142,24 @@ describe("transcript write route authorization", () => {
     expect(mocks.saveTranscript).not.toHaveBeenCalled();
   });
 
+  it.each([
+    ["identity_mismatch", { providerUserId: "18", username: "Other", blocked: false, groups: [], rights: ["edit"] }],
+    ["account_blocked", { providerUserId: "17", username: "Editor", blocked: true, groups: [], rights: ["edit"] }],
+    ["missing_edit_right", { providerUserId: "17", username: "Editor", blocked: false, groups: [], rights: ["read"] }],
+  ])("rejects fresh profile failure %s before saving", async (code, profile) => {
+    authenticatedSession();
+    mocks.isApprovedEditor.mockReturnValue(true);
+    mocks.fetchFactGridProfile.mockResolvedValue(profile);
+
+    const response = await PUT(request(), context);
+
+    expect(response.status).toBe(code === "identity_mismatch" ? 401 : 403);
+    expect(await response.json()).toMatchObject({ error: { code } });
+    expect(mocks.saveTranscript).not.toHaveBeenCalled();
+  });
+
   it("returns a confirmed save even when local cache invalidation fails", async () => {
-    mocks.readSessionToken.mockReturnValue("opaque-session");
-    mocks.getUsableProviderSession.mockResolvedValue({
-      providerUserId: "17",
-      username: "Editor",
-      accessToken: "provider-token",
-      refreshToken: null,
-      accessTokenExpiresAt: null,
-      expiresAt: Date.now() + 60_000,
-      csrfToken: "browser-csrf",
-    });
+    authenticatedSession();
     mocks.isApprovedEditor.mockReturnValue(true);
     mocks.fetchFactGridProfile.mockResolvedValue({
       providerUserId: "17",

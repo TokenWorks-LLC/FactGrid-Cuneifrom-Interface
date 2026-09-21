@@ -208,6 +208,9 @@ export interface MediaWikiRevision {
   revid?: number;
   parentid?: number;
   timestamp?: string;
+  user?: string;
+  userid?: number;
+  comment?: string;
   slots?: { main?: MediaWikiRevisionSlot };
 }
 
