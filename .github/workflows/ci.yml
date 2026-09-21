@@ -36,3 +36,6 @@ jobs:
       - run: npm ci
       - run: npx playwright install --with-deps chromium
       - run: npm run test:e2e
+      - name: Check the live FactGrid public contract
+        continue-on-error: true
+        run: npm run test:e2e:live

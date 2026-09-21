@@ -11,7 +11,7 @@
           "revid": 301,
           "parentid": 300,
           "timestamp": "2026-03-04T05:06:07Z",
-          "slots": { "main": { "contentmodel": "wikitext", "contentformat": "text/x-wiki", "content": "== Transcript ==\n<poem property=\"http://www.purl.org/cuneiform/hasTransliteration\">\n1) a-na EN\n</poem>\n" } }
+          "slots": { "main": { "contentmodel": "wikitext", "contentformat": "text/x-wiki", "content": "== Transcript ==\n<poem>\n1) a-na EN\n</poem>\n" } }
         }]
       },
       {

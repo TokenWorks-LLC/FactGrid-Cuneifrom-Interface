@@ -38,9 +38,17 @@ npm run lint
 npm run typecheck
 npm test
 npm run test:e2e
+npm run test:e2e:live
 npm run build
 npm run check
 ```
+
+`test:e2e` is the required deterministic desktop/mobile acceptance suite. It
+replays the checked-in, explicitly labelled FactGrid adapter fixtures at the
+network boundary while exercising the real Next.js server and browser UI.
+`test:e2e:live` is a separate bounded desktop smoke check against current public
+FactGrid records; upstream availability is reported in CI but does not replace
+or gate the deterministic acceptance suite.
 
 Playwright needs Chromium once on a new machine:
 

@@ -105,12 +105,25 @@ npm run typecheck
 npm test
 npx playwright install chromium
 npm run test:e2e
+npm run test:e2e:live
 npm run build
 ```
 
+The required `test:e2e` check runs the full Next.js application at desktop and
+mobile widths against checked-in adapter fixtures. This keeps homepage, search,
+filtering, multi-edition navigation, transcript rendering, and unavailable-auth
+acceptance deterministic. Its one reported skip is only the duplicate desktop
+execution of an assertion that explicitly requires the mobile navigation layout;
+the mobile project runs that assertion.
+
+`test:e2e:live` separately smoke-tests the public search and plain-transcript
+contract against current FactGrid records in one desktop worker. CI reports that
+result as advisory because a public upstream timeout must not turn a validated
+application build red. A release operator should still run it from the deployment
+network and record failures as upstream errors, never as an empty catalogue.
+
 Then smoke-test `/`, `/about`, `/browse`, one sparse tablet, and one multi-edition
-tablet at desktop and mobile widths. Treat a FactGrid timeout as an upstream error,
-not an empty catalogue.
+tablet at desktop and mobile widths on the deployed origin.
 
 For configured authentication, sign in, restart the same process/container with
 the same mounted volume, and confirm the session survives. Confirm the database,

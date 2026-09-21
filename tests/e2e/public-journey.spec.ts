@@ -46,29 +46,28 @@ test("mobile navigation and primary search remain operable", async ({ page }, te
   await expect(page.getByRole("search")).toBeVisible();
 });
 
-test("live catalogue search opens the multi-edition Prag record", async ({ page }) => {
-  test.setTimeout(60_000);
-
+test("catalogue search opens a multi-edition tablet", async ({ page }) => {
   await page.goto("/browse?q=Prag+I+437");
-  await page.getByLabel("Collection / holding").selectOption("Q512014");
+  await page.getByLabel("Name or identifier").fill("TEST FIXTURE");
+  await page.getByLabel("Collection / holding").selectOption("Q9000100");
   await page.getByRole("button", { name: "Apply search" }).click();
-  await expect(page).toHaveURL(/collection=Q512014/);
-  const result = page.getByRole("link", { name: /Prag I 437$/ }).first();
-  await expect(result).toHaveAttribute("href", "/tablets/Q499899");
+  await expect(page).toHaveURL(/collection=Q9000100/);
+  const result = page.getByRole("link", { name: /TEST FIXTURE.*tablet with editions/ }).first();
+  await expect(result).toHaveAttribute("href", "/tablets/Q9000002");
   await result.click();
 
-  await expect(page.getByRole("heading", { level: 1 })).toContainText("Prag I 437");
+  await expect(page.getByRole("heading", { level: 1 })).toContainText("TEST FIXTURE");
   await expect(page.getByRole("heading", { name: "Compare two editions" })).toBeVisible();
-  await expect(page.getByText("I 437", { exact: true })).toBeVisible();
+  await expect(page.getByText("a-na EN", { exact: false }).first()).toBeVisible();
   await expect(page.getByRole("navigation", { name: "Edition index" })).toBeVisible();
+  await page.locator("#comparison-left").selectOption("1");
+  await expect(page.locator("#comparison-left + pre")).toContainText("PTEST002:obverse.1.1");
 });
 
 test("plain Transcript-section poems remain readable", async ({ page }) => {
-  test.setTimeout(60_000);
+  await page.goto("/tablets/Q9000002");
 
-  await page.goto("/tablets/Q1089841");
-
-  await expect(page.getByText("ap-pa-tu", { exact: false }).first()).toBeVisible();
+  await expect(page.getByText("a-na EN", { exact: false }).first()).toBeVisible();
   await expect(page.getByText(/not on this deployment.*approved edit-target list/)).toBeVisible();
   expect(
     await page.locator("html").evaluate((element) => element.scrollWidth <= element.clientWidth),
