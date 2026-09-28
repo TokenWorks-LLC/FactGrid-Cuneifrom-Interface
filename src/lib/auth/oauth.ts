@@ -2,6 +2,7 @@ import * as oauth from "oauth4webapi";
 
 import type { AuthConfiguration } from "./config";
 import { UPSTREAM_TIMEOUT_MS } from "./constants";
+import { identifyOAuth1, signOAuth1Request } from "./oauth1";
 
 export interface FactGridProfile {
   providerUserId: string;
@@ -13,8 +14,28 @@ export interface FactGridProfile {
 
 export interface ProviderTokens {
   accessToken: string;
+  accessTokenSecret?: string | null;
   refreshToken: string | null;
   accessTokenExpiresAt: number | null;
+}
+
+export function providerAuthorizationHeader(
+  configuration: AuthConfiguration,
+  credentials: { accessToken: string; accessTokenSecret?: string | null; oauthVersion?: "1.0a" | "2.0" },
+  method: string,
+  url: string | URL,
+  body?: URLSearchParams,
+): string {
+  if ((credentials.oauthVersion ?? "2.0") !== (configuration.oauthVersion ?? "2.0")) {
+    throw new Error("The provider session uses a different OAuth protocol");
+  }
+  if (configuration.oauthVersion === "1.0a") {
+    if (!credentials.accessTokenSecret) throw new Error("Missing OAuth token secret");
+    return signOAuth1Request(configuration, method, url, {
+      key: credentials.accessToken, secret: credentials.accessTokenSecret,
+    }, body).authorization;
+  }
+  return `Bearer ${credentials.accessToken}`;
 }
 
 function authorizationServer(
@@ -130,7 +151,12 @@ function stringArray(value: unknown): string[] {
 export async function fetchFactGridProfile(
   accessToken: string,
   configuration: AuthConfiguration,
+  accessTokenSecret?: string | null,
 ): Promise<FactGridProfile> {
+  if (configuration.oauthVersion === "1.0a") {
+    if (!accessTokenSecret) throw new Error("Missing OAuth token secret");
+    return parseProfile(await identifyOAuth1({ key: accessToken, secret: accessTokenSecret }, configuration));
+  }
   const response = await timeoutFetch(configuration.oauth.profileEndpoint, {
     method: "GET",
     headers: {
@@ -157,7 +183,10 @@ export async function fetchFactGridProfile(
     throw new Error("FactGrid profile response is invalid");
   }
 
-  const profile = parsed as Record<string, unknown>;
+  return parseProfile(parsed as Record<string, unknown>);
+}
+
+function parseProfile(profile: Record<string, unknown>): FactGridProfile {
   const providerUserId =
     typeof profile.sub === "string"
       ? profile.sub
@@ -184,6 +213,9 @@ export async function refreshProviderTokens(
   configuration: AuthConfiguration,
   now = Date.now(),
 ): Promise<ProviderTokens> {
+  if (configuration.oauthVersion === "1.0a") {
+    throw new Error("OAuth 1.0a tokens do not use OAuth 2 refresh grants");
+  }
   const as = authorizationServer(configuration);
   const oauthClient = client(configuration);
   const response = await oauth.refreshTokenGrantRequest(

@@ -31,9 +31,10 @@ Readers arrive with tablet names, collection numbers, identifiers, periods, coll
 - Homepage, URL-driven catalogue search, QID-based tablet pages, and an about/source page are in scope.
 - Search must restrict catalogue membership before pagination and expose only filters supported by verified FactGrid predicates.
 - FactGrid is the only scholarly record store; no local catalogue, search index, CMS, or password system is permitted.
-- Authentication must use FactGrid's supported OAuth flow and remain disabled until client credentials, callback configuration, session security, and an approved editor policy are present.
+- Authentication uses FactGrid OAuth 1.0a (with legacy OAuth 2 retained) and requires consumer credentials, callback configuration, and session security. Sign-in is independent of the editor policy; actual writes also require that policy.
 - Writes are limited to a server-resolved, supported FactGrid-hosted transcript target associated with the selected tablet edition. Unsupported or external formats stay read-only.
-- Maps, 3D, annotations, metadata editing, uploads, record creation, advanced linguistic search, dashboards, and local revision storage are outside the MVP.
+- Every tablet exposes a public editor preview for metadata and transliteration drafts, including sparse records. Preview drafts stay in the current page and cannot save to FactGrid.
+- Live Wikibase metadata editing is planned, but only metadata draft controls are included now. Maps, 3D, annotations, uploads, record creation, advanced linguistic search, dashboards, and local revision storage remain outside this release.
 - Live scholarly writes require a designated authorized test record. Fixtures may test behavior but must never be presented as live FactGrid data.
 
 ## Brand Commitments

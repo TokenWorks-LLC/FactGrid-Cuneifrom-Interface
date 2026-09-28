@@ -1,8 +1,11 @@
 import { describe, expect, it, vi } from "vitest";
+import { createHmac } from "node:crypto";
 
 vi.mock("server-only", () => ({}));
 
 import type { TabletEdition } from "@/lib/factgrid/types";
+import { getAuthConfiguration } from "@/lib/auth/config";
+import { providerAuthorizationHeader } from "@/lib/auth/oauth";
 
 import {
   createMediaWikiEditClient,
@@ -89,6 +92,66 @@ async function inspected(client: MediaWikiEditClient) {
 }
 
 describe("FactGrid MediaWiki transcript writes", () => {
+  it("signs inspection, Unicode form edits, and readback with OAuth 1.0a credentials", async () => {
+    const result = getAuthConfiguration({
+      APP_ORIGIN: "https://app.example",
+      FACTGRID_OAUTH_CALLBACK_URL: "https://app.example/api/auth/callback",
+      FACTGRID_OAUTH_VERSION: "1.0a",
+      FACTGRID_OAUTH_CONSUMER_KEY: "consumer-key",
+      FACTGRID_OAUTH_CONSUMER_SECRET: "consumer-secret",
+      FACTGRID_SESSION_DB_PATH: ":memory:",
+      SESSION_SECRET: "x".repeat(32),
+    });
+    if (!result.available) throw new Error("Invalid test configuration");
+    const encode = (value: string) => encodeURIComponent(value).replace(
+      /[!'()*]/gu, (character) => `%${character.charCodeAt(0).toString(16).toUpperCase()}`,
+    );
+    let calls = 0;
+    const nonces = new Set<string>();
+    const fetchMock: typeof fetch = async (input, init) => {
+      const url = new URL(String(input));
+      const header = new Headers(init?.headers).get("authorization") ?? "";
+      expect(header).toMatch(/^OAuth /u);
+      expect(header).not.toContain("consumer-secret");
+      expect(header).not.toContain("access-secret");
+      const oauth = new Map([...header.matchAll(/(oauth_\w+)="([^"]*)"/gu)]
+        .map((match) => [match[1], decodeURIComponent(match[2])]));
+      expect(oauth.get("oauth_consumer_key")).toBe("consumer-key");
+      expect(oauth.get("oauth_token")).toBe("access-token");
+      expect(oauth.get("oauth_signature_method")).toBe("HMAC-SHA1");
+      nonces.add(oauth.get("oauth_nonce")!);
+      const signature = oauth.get("oauth_signature");
+      oauth.delete("oauth_signature");
+      const pairs = [...url.searchParams, ...oauth,
+        ...(init?.body instanceof URLSearchParams ? [...init.body] : [])];
+      const normalized = pairs.map(([key, value]) => [encode(key), encode(value)])
+        .sort(([ak, av], [bk, bv]) => ak < bk ? -1 : ak > bk ? 1 : av < bv ? -1 : av > bv ? 1 : 0)
+        .map(([key, value]) => `${key}=${value}`).join("&");
+      const base = [init?.method ?? "GET", `${url.origin}${url.pathname}`, normalized]
+        .map(encode).join("&");
+      expect(signature).toBe(createHmac("sha1", "consumer-secret&access-secret").update(base).digest("base64"));
+      calls += 1;
+      if (calls === 1) return json(inspection());
+      if (calls === 2) return json({ edit: {
+        result: "Success", pageid: 123, title: "D-Q42", oldrevid: 100, newrevid: 101,
+      } });
+      return json({ query: { pages: [page(101, updatedSource, { comment: "š + & = % / ?" })] } });
+    };
+    const client = createMediaWikiEditClient({
+      fetch: fetchMock,
+      authorizationHeader: (accessToken, method, url, body) => providerAuthorizationHeader(
+        result.config, { accessToken, accessTokenSecret: "access-secret", oauthVersion: "1.0a" },
+        method, url, body,
+      ),
+    });
+    const snapshot = await inspected(client);
+    await expect(client.submitEdit("access-token", snapshot, {
+      baseRevision: 100, text: "new line\nša", summary: "š + & = % / ?",
+    })).resolves.toEqual({ revisionId: 101, text: "new line\nša" });
+    expect(calls).toBe(3);
+    expect(nonces.size).toBe(3);
+  });
+
   it("splices only the verified poem bytes, uses conflict parameters, and reads back", async () => {
     const calls: Array<{ input: URL; init?: RequestInit }> = [];
     const fetchMock: typeof fetch = async (input, init) => {

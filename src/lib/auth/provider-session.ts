@@ -13,6 +13,10 @@ export async function getUsableProviderSession(
   const store = getSessionStore(configuration);
   const session = store.get(sessionToken, now);
   if (!session) return null;
+  if ((session.oauthVersion ?? "2.0") !== (configuration.oauthVersion ?? "2.0")) return null;
+  if (configuration.oauthVersion === "1.0a") {
+    return session.accessTokenSecret ? session : null;
+  }
   if (
     session.accessTokenExpiresAt === null ||
     session.accessTokenExpiresAt > now + 60_000

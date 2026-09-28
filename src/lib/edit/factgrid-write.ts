@@ -99,6 +99,12 @@ export interface MediaWikiEditClientOptions {
   fetch?: ServerFetch;
   timeoutMs?: number;
   maxResponseBytes?: number;
+  authorizationHeader?: (
+    accessToken: string,
+    method: "GET" | "POST",
+    url: URL,
+    body?: URLSearchParams,
+  ) => string;
 }
 
 function providerUnavailable(message: string, cause?: unknown): TranscriptEditError {
@@ -327,7 +333,9 @@ export function createMediaWikiEditClient(
         redirect: "error",
         headers: {
           Accept: "application/json",
-          Authorization: `Bearer ${accessToken}`,
+          Authorization: options.authorizationHeader
+            ? options.authorizationHeader(accessToken, "GET", url)
+            : `Bearer ${accessToken}`,
           "User-Agent": "FactGrid-Cuneiform-Interface/0.1 (transcript editor)",
         },
         signal: AbortSignal.timeout(timeoutMs),
@@ -455,7 +463,9 @@ export function createMediaWikiEditClient(
         redirect: "error",
         headers: {
           Accept: "application/json",
-          Authorization: `Bearer ${accessToken}`,
+          Authorization: options.authorizationHeader
+            ? options.authorizationHeader(accessToken, "POST", url, parameters)
+            : `Bearer ${accessToken}`,
           "Content-Type": "application/x-www-form-urlencoded;charset=UTF-8",
           "User-Agent": "FactGrid-Cuneiform-Interface/0.1 (transcript editor)",
         },

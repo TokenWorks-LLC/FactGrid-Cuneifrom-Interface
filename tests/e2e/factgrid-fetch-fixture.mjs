@@ -5,6 +5,9 @@ const fixtureRoot = join(process.cwd(), "tests", "fixtures", "factgrid");
 const tablet = JSON.parse(
   readFileSync(join(fixtureRoot, "entity-multiple-editions.json"), "utf8"),
 ).response.entities.Q9000002;
+const sparseTablet = JSON.parse(
+  readFileSync(join(fixtureRoot, "entity-sparse-no-transcript.json"), "utf8"),
+).response.entities.Q9000001;
 const revisions = JSON.parse(
   readFileSync(join(fixtureRoot, "document-revisions.json"), "utf8"),
 );
@@ -52,6 +55,7 @@ function json(value) {
 
 function entity(qid) {
   if (qid === "Q9000002") return tablet;
+  if (qid === "Q9000001") return sparseTablet;
   return {
     id: qid,
     labels: { en: { language: "en", value: labels[qid] ?? qid } },
@@ -105,7 +109,7 @@ globalThis.fetch = async (input, init) => {
 
   if (url.searchParams.get("action") === "wbgetentities") {
     const ids = (url.searchParams.get("ids") ?? "").split("|").filter(Boolean);
-    const tabletRequest = ids.length === 1 && ids[0] === "Q9000002";
+    const tabletRequest = ids.length === 1 && ["Q9000001", "Q9000002"].includes(ids[0]);
     const labelRequest = ids.length > 0 && ids.every((qid) => relatedQids.has(qid));
     if (!tabletRequest && !labelRequest) {
       throw new Error("Unexpected entity IDs in FactGrid acceptance fixture.");

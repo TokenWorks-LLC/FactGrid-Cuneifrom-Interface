@@ -6,6 +6,16 @@ export const FACTGRID_OAUTH_TOKEN_URL =
   `${FACTGRID_ORIGIN}/w/rest.php/oauth2/access_token`;
 export const FACTGRID_OAUTH_PROFILE_URL =
   `${FACTGRID_ORIGIN}/w/rest.php/oauth2/resource/profile`;
+// Use index.php with an explicit title so the signed query is exactly what
+// MediaWiki receives, including on installations with rewritten pretty URLs.
+export const FACTGRID_OAUTH1_INITIATE_URL =
+  `${FACTGRID_ORIGIN}/w/index.php?title=Special:OAuth/initiate`;
+export const FACTGRID_OAUTH1_AUTHORIZE_URL =
+  `${FACTGRID_ORIGIN}/wiki/Special:OAuth/authorize`;
+export const FACTGRID_OAUTH1_TOKEN_URL =
+  `${FACTGRID_ORIGIN}/w/index.php?title=Special:OAuth/token`;
+export const FACTGRID_OAUTH1_IDENTIFY_URL =
+  `${FACTGRID_ORIGIN}/w/index.php?title=Special:OAuth/identify`;
 
 export const AUTH_CALLBACK_PATH = "/api/auth/callback";
 export const SESSION_COOKIE_NAME = "factgrid_session";

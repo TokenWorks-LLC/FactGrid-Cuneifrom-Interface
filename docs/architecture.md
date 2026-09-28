@@ -11,7 +11,7 @@ Browser
   ├─ public pages ──> server-only FactGrid read adapter
   │                    ├─ MediaWiki Action API (entities, search, revisions)
   │                    └─ FactGrid SPARQL (contract discovery; never request-critical)
-  └─ private routes ─> OAuth/session layer ─> FactGrid OAuth 2
+  └─ private routes ─> OAuth/session layer ─> FactGrid OAuth 1.0a / OAuth 2
                      └─ write service ──────> MediaWiki Action API
 ```
 
@@ -43,15 +43,23 @@ and rendered MediaWiki HTML are not trusted or displayed.
 
 ## Authentication and sessions
 
-FactGrid OAuth 2 authorization code flow is implemented with `oauth4webapi`, an
+New deployments select OAuth 1.0a using `FACTGRID_OAUTH_VERSION=1.0a`. Request and
+access-token exchanges use signed MediaWiki requests; authenticated API requests
+sign the complete query or form body. The signed `Special:OAuth/identify` JWT is
+verified with `jose`, including its algorithm, issuer, audience, age, expiry, and
+request nonce. Temporary request-token credentials are encrypted in SQLite and
+bound to a short-lived browser transaction; callbacks consume them once.
+
+Existing OAuth 2 authorization code flow remains implemented with `oauth4webapi`, an
 exact callback, exact state validation, and S256 PKCE. OAuth endpoints are explicit;
 FactGrid is not treated as an OpenID Connect discovery provider.
 
 The browser receives only opaque HttpOnly cookies and an application CSRF value.
-Provider access and refresh tokens are encrypted at rest in a minimal SQLite
+Provider access tokens, OAuth 1.0a token secrets, and OAuth 2 refresh tokens are encrypted at rest in a minimal SQLite
 session table; opaque session identifiers are stored only as hashes. Cookies are
 SameSite=Lax, scoped to `/`, and Secure in production. Sessions expire and are
-deleted on logout. A new login revokes the prior session for the same FactGrid
+deleted on logout. OAuth 1.0a sessions use the local expiry and never attempt an
+OAuth 2 refresh-token exchange. A new login revokes the prior session for the same FactGrid
 identity, active rows are capped, and on POSIX the database file is forced to
 owner-only permissions. The SQLite file is operational session state, not a
 catalogue or account database.
@@ -70,7 +78,7 @@ Before one non-retried `action=edit` request, the service verifies:
 
 - complete auth configuration, feature switch, approved editor, and approved target;
 - exact request origin and application CSRF token;
-- a live, refreshed provider session and fresh FactGrid identity, block, and edit-right state;
+- a usable provider session (refreshed for OAuth 2 when necessary) and fresh FactGrid identity, block, and edit-right state;
 - current P251 membership and its exact fixed-host document title;
 - existing wikitext page, page protection/action eligibility, expected base revision,
   and one supported plain `D-Q…` transcript region, identified either by the
@@ -87,6 +95,13 @@ Network failures after submission are reported as an ambiguous outcome and are n
 blindly retried.
 
 ## Rendering boundary
+
+`/tablets/[qid]/edit` is a public, in-memory draft preview. It reads the same public
+record data and exposes metadata and transliteration controls even when OAuth or
+live editing is unavailable. Preview mode has no save request path. It does not
+relax the write-route checks or make unsupported transcript formats writable.
+Metadata controls demonstrate the interface; Wikibase metadata mutations remain
+future work.
 
 React escapes record strings and editor previews. Wikitext display is reduced to
 sanitized plain text; raw MediaWiki HTML is never injected. External URLs are

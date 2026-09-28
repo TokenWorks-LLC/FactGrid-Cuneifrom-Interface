@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import { AlertTriangle, Check, ExternalLink, LoaderCircle } from "lucide-react";
 
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -16,37 +16,38 @@ type SaveState =
   | { status: "saved"; message: string }
   | { status: "error" | "conflict" | "unknown"; message: string };
 
-export interface TransliterationEditorProps {
-  qid: string;
-  editionId: string;
+export type TransliterationEditorProps = {
   initialText: string;
-  initialRevision: number;
-  csrfToken: string;
   historyUrl: string;
-}
+} & (
+  | { previewOnly: true; previewDescription: string }
+  | {
+      previewOnly?: false;
+      qid: string;
+      editionId: string;
+      initialRevision: number;
+      csrfToken: string;
+    }
+);
 
-export function TransliterationEditor({
-  qid,
-  editionId,
-  initialText,
-  initialRevision,
-  csrfToken,
-  historyUrl,
-}: TransliterationEditorProps) {
+export function TransliterationEditor(props: TransliterationEditorProps) {
+  const { initialText, historyUrl } = props;
+  const editorId = useId();
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const [text, setText] = useState(initialText);
   const [savedText, setSavedText] = useState(initialText);
-  const [revision, setRevision] = useState(initialRevision);
+  const [revision, setRevision] = useState(props.previewOnly ? 0 : props.initialRevision);
   const [summary, setSummary] = useState("");
   const [saveState, setSaveState] = useState<SaveState>({ status: "idle" });
   const dirty = text !== savedText;
+  const draftChanged = dirty || (props.previewOnly && summary.length > 0);
 
   useEffect(() => {
-    if (!dirty) return;
+    if (!draftChanged) return;
     const warn = (event: BeforeUnloadEvent) => event.preventDefault();
     window.addEventListener("beforeunload", warn);
     return () => window.removeEventListener("beforeunload", warn);
-  }, [dirty]);
+  }, [draftChanged]);
 
   function insertCharacter(character: string) {
     const textarea = textareaRef.current;
@@ -61,24 +62,26 @@ export function TransliterationEditor({
   }
 
   function cancelChanges() {
-    if (dirty && !window.confirm("Discard the unsaved changes in this editor?")) return;
+    if (draftChanged && !window.confirm("Discard the unsaved changes in this editor?")) return;
     setText(savedText);
     setSummary("");
     setSaveState({ status: "idle" });
   }
 
   async function save() {
-    if (!dirty || saveState.status === "saving") return;
+    // Preview rendering and live authorization are deliberately separate. Even
+    // an accidental invocation of this handler cannot submit a preview draft.
+    if (props.previewOnly || !dirty || saveState.status === "saving") return;
     setSaveState({ status: "saving" });
 
     try {
       const response = await fetch(
-        `/api/tablets/${encodeURIComponent(qid)}/editions/${encodeURIComponent(editionId)}`,
+        `/api/tablets/${encodeURIComponent(props.qid)}/editions/${encodeURIComponent(props.editionId)}`,
         {
           method: "PUT",
           headers: {
             "Content-Type": "application/json",
-            "X-CSRF-Token": csrfToken,
+            "X-CSRF-Token": props.csrfToken,
           },
           body: JSON.stringify({ baseRevision: revision, text, summary }),
         },
@@ -140,14 +143,16 @@ export function TransliterationEditor({
   }
 
   return (
-    <section aria-labelledby="editor-title" className="border-t border-border pt-8">
+    <section aria-labelledby={`${editorId}-title`} className="border-t border-border pt-8">
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div>
-          <h2 id="editor-title" className="font-heading text-3xl font-medium">
+          <h2 id={`${editorId}-title`} className="font-heading text-3xl font-medium">
             Edit transliteration
           </h2>
           <p className="mt-2 max-w-[65ch] text-sm leading-6 text-muted-foreground">
-            Only the verified plain transcript region will change. Formatting and content outside that region remain byte-for-byte intact.
+            {props.previewOnly
+              ? props.previewDescription
+              : "Only the verified plain transcript region will change. Formatting and content outside that region remain byte-for-byte intact."}
           </p>
         </div>
         <a
@@ -163,7 +168,7 @@ export function TransliterationEditor({
 
       <div className="mt-7 grid gap-8 xl:grid-cols-2">
         <div>
-          <Label htmlFor="transliteration">Transliteration source</Label>
+          <Label htmlFor={`${editorId}-transliteration`}>Transliteration source</Label>
           <div aria-label="Insert a special character" className="mt-3 flex flex-wrap gap-1.5">
             {SPECIAL_CHARACTERS.map((character) => (
               <Button
@@ -182,7 +187,7 @@ export function TransliterationEditor({
           <Textarea
             ref={textareaRef}
             className="transcript-text mt-3 min-h-96 resize-y rounded-none bg-card text-sm leading-6"
-            id="transliteration"
+            id={`${editorId}-transliteration`}
             onChange={(event) => {
               setText(event.target.value);
               if (saveState.status !== "idle") setSaveState({ status: "idle" });
@@ -191,10 +196,10 @@ export function TransliterationEditor({
             value={text}
           />
           <div className="mt-5">
-            <Label htmlFor="edit-summary">Edit summary</Label>
+            <Label htmlFor={`${editorId}-summary`}>Edit summary</Label>
             <input
               className="mt-2 h-11 w-full border border-input bg-background px-3 text-sm"
-              id="edit-summary"
+              id={`${editorId}-summary`}
               maxLength={255}
               onChange={(event) => setSummary(event.target.value)}
               placeholder="Briefly describe this change"
@@ -205,7 +210,7 @@ export function TransliterationEditor({
 
         <div>
           <p className="text-sm font-medium">Plain-text preview</p>
-          <pre className="transcript-text mt-3 min-h-96 overflow-x-auto border border-border bg-card p-5 text-sm leading-6 whitespace-pre-wrap">
+          <pre aria-label="Plain-text preview" className="transcript-text mt-3 min-h-96 overflow-x-auto border border-border bg-card p-5 text-sm leading-6 break-words whitespace-pre-wrap">
             {text || "The transcript is empty."}
           </pre>
         </div>
@@ -223,7 +228,7 @@ export function TransliterationEditor({
       ) : null}
 
       <div className="mt-6 flex flex-wrap items-center gap-3">
-        <Button className="min-h-11 rounded-none" disabled={!dirty || saveState.status === "saving"} onClick={save} type="button">
+        <Button aria-describedby={props.previewOnly ? `${editorId}-save-help` : undefined} className="min-h-11 rounded-none" disabled={props.previewOnly || !dirty || saveState.status === "saving"} onClick={save} type="button">
           {saveState.status === "saving" ? (
             <>
               <LoaderCircle aria-hidden="true" className="size-4 animate-spin" />
@@ -233,13 +238,18 @@ export function TransliterationEditor({
             "Save to FactGrid"
           )}
         </Button>
-        <Button className="min-h-11 rounded-none" disabled={!dirty || saveState.status === "saving"} onClick={cancelChanges} type="button" variant="outline">
-          Cancel changes
+        <Button className="min-h-11 rounded-none" disabled={!draftChanged || saveState.status === "saving"} onClick={cancelChanges} type="button" variant="outline">
+          {props.previewOnly ? "Reset transcript draft" : "Cancel changes"}
         </Button>
         <span aria-live="polite" className="text-sm text-muted-foreground">
-          {dirty ? "Unsaved changes" : `Revision ${revision}`}
+          {props.previewOnly ? (draftChanged ? "Draft changed · not saved" : "Preview ready") : dirty ? "Unsaved changes" : `Revision ${revision}`}
         </span>
       </div>
+      {props.previewOnly ? (
+        <p className="mt-3 text-sm leading-6 text-muted-foreground" id={`${editorId}-save-help`}>
+          Saving is unavailable in this preview. Approved editors can save supported editions from the tablet record after signing in.
+        </p>
+      ) : null}
     </section>
   );
 }

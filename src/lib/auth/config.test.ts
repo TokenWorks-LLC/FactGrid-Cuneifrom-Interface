@@ -40,6 +40,22 @@ describe("getAuthConfiguration", () => {
     expect(result.config.callbackUrl).toBe(completeEnvironment.FACTGRID_OAUTH_CALLBACK_URL);
   });
 
+  it("requires separate consumer credentials when OAuth 1.0a is selected", () => {
+    const missing = getAuthConfiguration({ ...completeEnvironment, FACTGRID_OAUTH_VERSION: "1.0a" });
+    expect(missing).toMatchObject({ available: false, missing: ["FACTGRID_OAUTH_CONSUMER_KEY", "FACTGRID_OAUTH_CONSUMER_SECRET"] });
+    const result = getAuthConfiguration({
+      ...completeEnvironment,
+      FACTGRID_OAUTH_VERSION: "1.0a",
+      FACTGRID_OAUTH_CONSUMER_KEY: "consumer-key",
+      FACTGRID_OAUTH_CONSUMER_SECRET: "consumer-secret",
+    });
+    expect(result).toMatchObject({ available: true, config: {
+      oauthVersion: "1.0a", clientId: "consumer-key", clientSecret: "consumer-secret",
+      oauth: { profileEndpoint: "https://database.factgrid.de/w/index.php?title=Special:OAuth/identify" },
+    } });
+    expect(getAuthConfiguration({ ...completeEnvironment, FACTGRID_OAUTH_VERSION: "1" })).toMatchObject({ available: false, invalid: ["FACTGRID_OAUTH_VERSION"] });
+  });
+
   it("rejects a callback outside the exact callback route and origin", () => {
     const wrongOrigin = getAuthConfiguration({
       ...completeEnvironment,

@@ -6,6 +6,7 @@ import { afterEach, describe, expect, it } from "vitest";
 
 import { SESSION_TTL_SECONDS } from "./constants";
 import { SessionStore } from "./session-store";
+import { hashOpaqueToken, sealString } from "./crypto";
 
 const stores: SessionStore[] = [];
 const temporaryDirectories: string[] = [];
@@ -24,6 +25,35 @@ afterEach(() => {
 });
 
 describe("SessionStore", () => {
+  it("upgrades an existing OAuth 2 database without losing its sessions", () => {
+    const database = new Database(":memory:");
+    database.exec(`CREATE TABLE auth_sessions (
+      id_hash TEXT PRIMARY KEY, provider_user_id TEXT NOT NULL,
+      username TEXT NOT NULL, access_token TEXT NOT NULL, refresh_token TEXT,
+      access_token_expires_at INTEGER, expires_at INTEGER NOT NULL,
+      csrf_token TEXT NOT NULL, created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL
+    )`);
+    const now = Date.now();
+    const secret = "s".repeat(32);
+    const token = "legacy-browser-token";
+    const idHash = hashOpaqueToken(token);
+    database.prepare("INSERT INTO auth_sessions VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)").run(
+      idHash, "42", "Existing scholar",
+      sealString("legacy-access", secret, `provider-access-token:${idHash}`),
+      null, null, now + 60_000, "csrf", now, now,
+    );
+    const upgraded = new SessionStore(database, secret);
+    stores.push(upgraded);
+    expect(upgraded.get(token, now)).toMatchObject({
+      oauthVersion: "2.0", username: "Existing scholar", accessToken: "legacy-access", accessTokenSecret: null,
+    });
+    const newLogin = upgraded.create({
+      oauthVersion: "1.0a", providerUserId: "43", username: "New scholar",
+      accessToken: "new-access", accessTokenSecret: "new-access-secret",
+    }, now);
+    expect(upgraded.get(newLogin.token, now)).toMatchObject({ oauthVersion: "1.0a", accessTokenSecret: "new-access-secret" });
+    expect(upgraded.get(token, now)?.username).toBe("Existing scholar");
+  });
   it("stores only a hashed session ID and encrypted provider tokens", () => {
     const sessions = store();
     const created = sessions.create(

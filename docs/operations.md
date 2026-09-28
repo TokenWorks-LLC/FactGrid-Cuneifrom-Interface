@@ -80,22 +80,40 @@ No secrets are required. Leave the OAuth fields empty and
 `FACTGRID_EDITING_ENABLED=false`. `/api/session` returns an unavailable status and
 the shared desktop/mobile header keeps `Log in with FactGrid` visible with an
 `Unavailable` status. That entry opens an accessible explanation rather than a
-raw API error. Public FactGrid reads continue.
+raw API error. Public FactGrid reads and `/tablets/[qid]/edit` draft previews continue.
+No credentials are needed to try the preview; it cannot save to FactGrid.
 
 ## Enabling FactGrid sign-in
 
-A FactGrid `sysop` must register and approve a confidential, non-owner-only OAuth
-2 client. Other FactGrid accounts can authorize it after approval; they do not
-need separate administrator approval:
+FactGrid's developer has confirmed that the operator can propose an OAuth 1.0a
+consumer and FactGrid administrators can approve it. Use the
+[OAuth 1.0a registration form](https://database.factgrid.de/wiki/Special:OAuthConsumerRegistration/propose/oauth1a):
 
-1. use authorization-code and refresh-token grants;
-2. request the minimum `editpage` grant plus provider-required basic access;
+1. register an application usable by other accounts, leaving owner-only mode off;
+2. request **Edit existing pages** and required basic access. The developer also
+   offered **Create, edit, and move pages** for the broader project; request it
+   only if that broader capability is intended. A grant alone does not implement
+   metadata editing or page creation in this interface;
 3. register the exact HTTPS callback
-   `https://YOUR_ORIGIN/api/auth/callback` (no wildcard);
-4. provide the client ID and secret through the deployment secret manager;
+   `https://YOUR_ORIGIN/api/auth/callback`, with callback-prefix matching disabled.
+   The application sends `oauth_callback=oob` to use that exact registered URL;
+4. set `FACTGRID_OAUTH_VERSION=1.0a` and provide `FACTGRID_OAUTH_CONSUMER_KEY` and
+   `FACTGRID_OAUTH_CONSUMER_SECRET` through the deployment secret manager;
 5. set a random `SESSION_SECRET` of at least 32 bytes;
 6. set `APP_ORIGIN`, `FACTGRID_OAUTH_CALLBACK_URL`, and a persistent
    `FACTGRID_SESSION_DB_PATH`.
+
+Share the consumer registration identifier and repository URL with the approving
+administrator. Do not email secrets or commit them. Each user's access token and
+token secret are obtained during authorization and encrypted in the session store;
+they are not shared deployment configuration. There is no OAuth 1.0a refresh token.
+Local logout removes the application session; revoking the provider grant is a
+separate FactGrid action.
+
+Existing OAuth 2 deployments can retain `FACTGRID_OAUTH_VERSION=2.0` with
+`FACTGRID_OAUTH_CLIENT_ID` and `FACTGRID_OAUTH_CLIENT_SECRET`. An omitted version
+also preserves that legacy behavior. Do not place OAuth 1.0a credentials into the
+OAuth 2 fields. Changing protocols requires a fresh login.
 
 Restart, confirm `/api/session` is private/no-store, and complete sign-in with a
 non-writing account before considering edits. A configured anonymous browser is
@@ -154,10 +172,12 @@ fixture plus TLS reverse proxy to exercise the real login, callback, session, an
 logout handlers with synthetic credentials. Passing it establishes container and
 fixture-based authentication behavior only; it does not establish that a real
 FactGrid OAuth consumer has been approved or that live FactGrid sign-in works.
+The default harness protocol is OAuth 1.0a. Set
+`FACTGRID_DOCKER_OAUTH_VERSION=2.0` for the legacy OAuth 2 flow; CI verifies both.
 
 The required `test:e2e` check runs the full Next.js application at desktop and
 mobile widths against checked-in adapter fixtures. This keeps homepage, search,
-filtering, multi-edition navigation, transcript rendering, and unavailable-auth
+filtering, multi-edition navigation, transcript rendering, public draft previews, and unavailable-auth
 acceptance deterministic. Its one reported skip is only the duplicate desktop
 execution of an assertion that explicitly requires the mobile navigation layout;
 the mobile project runs that assertion.

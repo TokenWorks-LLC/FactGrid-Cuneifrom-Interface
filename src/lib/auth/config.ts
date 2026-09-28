@@ -4,9 +4,14 @@ import {
   FACTGRID_OAUTH_ISSUER,
   FACTGRID_OAUTH_PROFILE_URL,
   FACTGRID_OAUTH_TOKEN_URL,
+  FACTGRID_OAUTH1_AUTHORIZE_URL,
+  FACTGRID_OAUTH1_TOKEN_URL,
+  FACTGRID_OAUTH1_IDENTIFY_URL,
 } from "./constants";
 
 export interface AuthConfiguration {
+  /** Omitted only by legacy callers; existing deployments default to OAuth 2.0. */
+  oauthVersion?: "1.0a" | "2.0";
   appOrigin: string;
   callbackUrl: string;
   clientId: string;
@@ -33,8 +38,6 @@ type Environment = Partial<Record<string, string | undefined>>;
 const REQUIRED_ENVIRONMENT = [
   "APP_ORIGIN",
   "FACTGRID_OAUTH_CALLBACK_URL",
-  "FACTGRID_OAUTH_CLIENT_ID",
-  "FACTGRID_OAUTH_CLIENT_SECRET",
   "FACTGRID_SESSION_DB_PATH",
   "SESSION_SECRET",
 ] as const;
@@ -69,8 +72,17 @@ export function parseAllowedEditors(value: string | undefined): ReadonlySet<stri
 export function getAuthConfiguration(
   env: Environment = process.env,
 ): AuthConfigurationResult {
-  const missing = REQUIRED_ENVIRONMENT.filter((name) => !env[name]?.trim());
+  const oauthVersion = env.FACTGRID_OAUTH_VERSION?.trim() || "2.0";
+  const keyName = oauthVersion === "1.0a"
+    ? "FACTGRID_OAUTH_CONSUMER_KEY" : "FACTGRID_OAUTH_CLIENT_ID";
+  const secretName = oauthVersion === "1.0a"
+    ? "FACTGRID_OAUTH_CONSUMER_SECRET" : "FACTGRID_OAUTH_CLIENT_SECRET";
+  const missing = [...REQUIRED_ENVIRONMENT, keyName, secretName]
+    .filter((name) => !env[name]?.trim());
   const invalid: string[] = [];
+  if (oauthVersion !== "1.0a" && oauthVersion !== "2.0") {
+    invalid.push("FACTGRID_OAUTH_VERSION");
+  }
 
   if (missing.length > 0) {
     return { available: false, missing: [...missing], invalid };
@@ -115,10 +127,11 @@ export function getAuthConfiguration(
   return {
     available: true,
     config: {
+      oauthVersion: oauthVersion as "1.0a" | "2.0",
       appOrigin: appOriginUrl.origin,
       callbackUrl: callbackUrl.href,
-      clientId: env.FACTGRID_OAUTH_CLIENT_ID!,
-      clientSecret: env.FACTGRID_OAUTH_CLIENT_SECRET!,
+      clientId: env[keyName]!,
+      clientSecret: env[secretName]!,
       sessionDbPath: env.FACTGRID_SESSION_DB_PATH!,
       sessionSecret: env.SESSION_SECRET!,
       secureCookies: production,
@@ -126,9 +139,12 @@ export function getAuthConfiguration(
       allowedEditors: parseAllowedEditors(env.FACTGRID_ALLOWED_EDITORS),
       oauth: {
         issuer: FACTGRID_OAUTH_ISSUER,
-        authorizationEndpoint: FACTGRID_OAUTH_AUTHORIZE_URL,
-        tokenEndpoint: FACTGRID_OAUTH_TOKEN_URL,
-        profileEndpoint: FACTGRID_OAUTH_PROFILE_URL,
+        authorizationEndpoint: oauthVersion === "1.0a"
+          ? FACTGRID_OAUTH1_AUTHORIZE_URL : FACTGRID_OAUTH_AUTHORIZE_URL,
+        tokenEndpoint: oauthVersion === "1.0a"
+          ? FACTGRID_OAUTH1_TOKEN_URL : FACTGRID_OAUTH_TOKEN_URL,
+        profileEndpoint: oauthVersion === "1.0a"
+          ? FACTGRID_OAUTH1_IDENTIFY_URL : FACTGRID_OAUTH_PROFILE_URL,
       },
     },
   };

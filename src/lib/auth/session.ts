@@ -41,9 +41,11 @@ export function readSession(
   request: NextRequest,
   configuration: AuthConfiguration,
 ): SessionSummary | null {
-  return getSessionStore(configuration).getSummary(
+  const summary = getSessionStore(configuration).getSummary(
     request.cookies.get(SESSION_COOKIE_NAME)?.value,
   );
+  return summary && (summary.oauthVersion ?? "2.0") === (configuration.oauthVersion ?? "2.0")
+    ? summary : null;
 }
 
 export function readSessionToken(request: NextRequest): string | null {

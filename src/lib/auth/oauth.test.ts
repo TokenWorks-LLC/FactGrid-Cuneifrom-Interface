@@ -1,6 +1,8 @@
 import * as oauth from "oauth4webapi";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
+vi.mock("server-only", () => ({}));
+
 import { getAuthConfiguration } from "./config";
 import {
   buildAuthorizationUrl,

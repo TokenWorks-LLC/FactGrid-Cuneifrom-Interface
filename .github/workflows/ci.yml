@@ -43,6 +43,12 @@ jobs:
   docker-runtime:
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        oauth-version: ["1.0a", "2.0"]
+    env:
+      FACTGRID_DOCKER_OAUTH_VERSION: ${{ matrix.oauth-version }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4

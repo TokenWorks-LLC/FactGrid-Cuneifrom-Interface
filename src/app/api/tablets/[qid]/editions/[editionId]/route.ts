@@ -3,7 +3,7 @@ import { NextRequest, NextResponse } from "next/server";
 
 import { getAuthConfiguration } from "@/lib/auth/config";
 import { CSRF_HEADER_NAME } from "@/lib/auth/constants";
-import { fetchFactGridProfile } from "@/lib/auth/oauth";
+import { fetchFactGridProfile, providerAuthorizationHeader } from "@/lib/auth/oauth";
 import {
   hasValidCsrfToken,
   isApprovedEditor,
@@ -20,7 +20,7 @@ import {
   isTranscriptEditError,
   type TranscriptEditError,
 } from "@/lib/edit/errors";
-import { saveTranscript } from "@/lib/edit/factgrid-write";
+import { createMediaWikiEditClient, saveTranscript } from "@/lib/edit/factgrid-write";
 import { writeRateLimiter } from "@/lib/edit/rate-limit";
 import { parseTranscriptWriteRequest } from "@/lib/edit/request";
 import { isFactGridError, type FactGridError } from "@/lib/factgrid/errors";
@@ -167,7 +167,11 @@ export async function PUT(
   try {
     // Authorization is re-fetched for every write; session-time profile data is
     // deliberately not trusted for current rights or block status.
-    profile = await fetchFactGridProfile(session.accessToken, configuration);
+    profile = await fetchFactGridProfile(
+      session.accessToken,
+      configuration,
+      session.accessTokenSecret,
+    );
   } catch {
     return errorResponse(
       502,
@@ -178,13 +182,23 @@ export async function PUT(
 
   try {
     const identity = verifyFreshEditorProfile(session, profile, configuration);
+    const mediaWiki = createMediaWikiEditClient({
+      authorizationHeader: (accessToken, method, url, body) =>
+        providerAuthorizationHeader(
+          configuration,
+          { accessToken, accessTokenSecret: session.accessTokenSecret, oauthVersion: session.oauthVersion },
+          method,
+          url,
+          body,
+        ),
+    });
     const saved = await saveTranscript({
       qid,
       editionId,
       accessToken: session.accessToken,
       identity,
       request: writeRequest,
-    });
+    }, { mediaWiki });
 
     // The FactGrid write and readback are already confirmed. A local cache
     // invalidation failure must not turn that success into an ambiguous retry.

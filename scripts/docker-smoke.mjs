@@ -20,6 +20,8 @@ const names = {
 };
 const temporaryDirectory = mkdtempSync(join(tmpdir(), `${prefix}-`));
 const sessionSecret = "docker-smoke-session-secret-32-bytes-minimum";
+const oauthVersion = process.env.FACTGRID_DOCKER_OAUTH_VERSION ?? "1.0a";
+assert.ok(["1.0a", "2.0"].includes(oauthVersion), "FACTGRID_DOCKER_OAUTH_VERSION must be 1.0a or 2.0.");
 const forwardedHeaders = {
   host: "app.factgrid.test",
   "x-forwarded-host": "app.factgrid.test",
@@ -147,10 +149,16 @@ function appRunArguments(configured) {
     environment.push(
       "APP_ORIGIN=https://app.factgrid.test",
       "FACTGRID_OAUTH_CALLBACK_URL=https://app.factgrid.test/api/auth/callback",
-      "FACTGRID_OAUTH_CLIENT_ID=synthetic-client",
-      "FACTGRID_OAUTH_CLIENT_SECRET=synthetic-client-secret",
+      `FACTGRID_OAUTH_VERSION=${oauthVersion}`,
       `SESSION_SECRET=${sessionSecret}`,
     );
+    environment.push(...(oauthVersion === "1.0a" ? [
+      "FACTGRID_OAUTH_CONSUMER_KEY=synthetic-consumer",
+      "FACTGRID_OAUTH_CONSUMER_SECRET=synthetic-consumer-secret",
+    ] : [
+      "FACTGRID_OAUTH_CLIENT_ID=synthetic-client",
+      "FACTGRID_OAUTH_CLIENT_SECRET=synthetic-client-secret",
+    ]));
   }
   return [
     "run",
@@ -249,6 +257,9 @@ function assertNoSyntheticSecrets(response) {
   assert.doesNotMatch(serialized, /docker-smoke-session-secret/u);
   assert.doesNotMatch(serialized, /synthetic-access-token/u);
   assert.doesNotMatch(serialized, /synthetic-refresh-token/u);
+  assert.doesNotMatch(serialized, /synthetic-consumer-secret/u);
+  assert.doesNotMatch(serialized, /synthetic-request-secret/u);
+  assert.doesNotMatch(serialized, /synthetic-access-secret/u);
 }
 
 async function run() {
@@ -320,7 +331,7 @@ async function run() {
   await verifyUnavailableUi(appPort);
   stopApp();
 
-  log("completing the synthetic OAuth flow inside the production container");
+  log(`completing synthetic OAuth ${oauthVersion} inside the production container`);
   await startApp(true);
   appPort = appProxyPort;
   const login = await request({
@@ -339,7 +350,15 @@ async function run() {
   assert.match(transaction.header, /Priority=High/iu);
   const authorizationUrl = new URL(login.headers.location);
   assert.equal(authorizationUrl.origin, "https://database.factgrid.de");
-  assert.equal(authorizationUrl.searchParams.get("code_challenge_method"), "S256");
+  if (oauthVersion === "1.0a") {
+    assert.equal(authorizationUrl.pathname, "/wiki/Special:OAuth/authorize");
+    assert.equal(authorizationUrl.searchParams.get("oauth_consumer_key"), "synthetic-consumer");
+    assert.match(authorizationUrl.searchParams.get("oauth_token") ?? "", /^synthetic-request-token-/u);
+    assert.equal(authorizationUrl.searchParams.has("oauth_token_secret"), false);
+  } else {
+    assert.equal(authorizationUrl.pathname, "/w/rest.php/oauth2/authorize");
+    assert.equal(authorizationUrl.searchParams.get("code_challenge_method"), "S256");
+  }
   assert.equal(authorizationUrl.searchParams.has("code_verifier"), false);
   assert.equal(authorizationUrl.searchParams.has("client_secret"), false);
 
@@ -368,6 +387,30 @@ async function run() {
   assert.match(session.header, /Secure/u);
   assert.match(session.header, /SameSite=Lax/iu);
   assert.match(session.header, /Priority=High/iu);
+
+  if (oauthVersion === "1.0a") {
+    const audit = await request({
+      port: providerPort,
+      path: "/fixture/oauth1-audit",
+      headers: { host: "database.factgrid.de" },
+      tls: { ca: providerCa, servername: "database.factgrid.de" },
+    });
+    assert.equal(audit.status, 200);
+    assert.deepEqual(JSON.parse(audit.body), { initiate: 1, token: 1, identify: 1 });
+
+    // A used callback must never create a second authenticated session, even
+    // when the browser replays its original encrypted transaction cookie.
+    const replay = await request({
+      port: appPort,
+      path: `${callbackUrl.pathname}${callbackUrl.search}`,
+      headers: { ...forwardedHeaders, cookie: transaction.pair },
+      tls: appTls,
+    });
+    assert.ok(replay.status >= 400 && replay.status < 600);
+    assert.equal((replay.headers["set-cookie"] ?? []).some((value) => value.startsWith("factgrid_session=")), false);
+    assertPrivate(replay);
+    assertNoSyntheticSecrets(replay);
+  }
 
   let sessionResponse = await request({
     port: appPort,
@@ -486,7 +529,7 @@ async function run() {
     "const f=require('node:fs');if(!f.existsSync('/data/factgrid-sessions.sqlite'))process.exit(1)",
   ], { capture: true });
 
-  log("all Docker build, runtime, browser, persistence, and security checks passed");
+  log(`all OAuth ${oauthVersion} Docker build, runtime, browser, persistence, and security checks passed`);
 }
 
 let cleanupStarted = false;

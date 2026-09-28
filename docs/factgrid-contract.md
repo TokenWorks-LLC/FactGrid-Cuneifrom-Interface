@@ -4,15 +4,24 @@ The contract below was checked read-only against FactGrid on 21 September 2026.
 It intentionally records uncertainty and avoids turning observed conventions into
 universal guarantees.
 
+Authentication guidance was updated on 28 September 2026 following the project
+operator's correspondence with FactGrid developer Tinghui. The OAuth 1.0a flow
+below is implemented against MediaWiki's documented protocol; real FactGrid
+consumer approval and sign-in still require live acceptance.
+
 ## Endpoints
 
 | Purpose | Endpoint |
 |---|---|
 | MediaWiki/Wikibase API | `https://database.factgrid.de/w/api.php` |
 | SPARQL | `https://database.factgrid.de/sparql` |
-| OAuth authorization | `https://database.factgrid.de/w/rest.php/oauth2/authorize` |
-| OAuth token | `https://database.factgrid.de/w/rest.php/oauth2/access_token` |
-| OAuth profile | `https://database.factgrid.de/w/rest.php/oauth2/resource/profile` |
+| OAuth 1.0a request token | `https://database.factgrid.de/w/index.php?title=Special:OAuth/initiate` |
+| OAuth 1.0a authorization | `https://database.factgrid.de/wiki/Special:OAuth/authorize` |
+| OAuth 1.0a access token | `https://database.factgrid.de/w/index.php?title=Special:OAuth/token` |
+| OAuth 1.0a identity | `https://database.factgrid.de/w/index.php?title=Special:OAuth/identify` |
+| OAuth 2 authorization (legacy) | `https://database.factgrid.de/w/rest.php/oauth2/authorize` |
+| OAuth 2 token (legacy) | `https://database.factgrid.de/w/rest.php/oauth2/access_token` |
+| OAuth 2 profile (legacy) | `https://database.factgrid.de/w/rest.php/oauth2/resource/profile` |
 
 The `/query/` path is the human query UI, not the machine SPARQL endpoint. No
 working OpenID discovery endpoint was found, so OAuth configuration is explicit.
@@ -121,18 +130,29 @@ verified Commons photograph with visible attribution.
 
 ## Identity and editing policy
 
-FactGrid runs an independent account system. OAuth 2 supports confidential clients,
-authorization code, refresh tokens, bearer-authenticated API calls, PKCE, profile
-fields, and edit grants. The minimum requested project grant is `editpage`; identity-
-only access cannot write through the Action API.
+FactGrid runs an independent account system. Tinghui directed the project to
+propose an OAuth 1.0a consumer with **Edit existing pages** and, for broader work,
+**Create, edit, and move pages**. He confirmed that he or Olaf can approve the
+proposal. This supersedes the earlier inference from public group-rights data
+that administrators had to perform both registration and approval.
 
-The current user-group response assigns both OAuth consumer registration/proposal
-and approval rights only to `sysop`, so a FactGrid administrator must perform both
-actions. An approved non-owner-only consumer can then be authorized by other
+OAuth 1.0a uses a consumer key/secret and separate per-user token/secret pairs.
+Requests use HMAC-SHA1 signatures; identity uses a verified HS256 JWT from the
+identify endpoint. OAuth 2 authorization code, PKCE, and refresh-token support is
+retained for existing deployments. Identity-only access cannot write through the
+Action API. An approved non-owner-only consumer can be authorized by other
 FactGrid accounts without per-user administrator action. No published cuneiform-
 specific editor policy was found. Consequently,
 the application additionally requires a deployment-maintained exact username
 allowlist and exact target allowlist, and editing defaults to disabled.
+
+Identity JWTs require the exact issuer `https://database.factgrid.de`. The OAuth
+extension constructs `iss` from MediaWiki's `CanonicalServer`; FactGrid's public
+site-info API reported that server origin and MediaWiki 1.43.6 on 28 September
+2026. A bare hostname is not accepted as an alternative issuer.
+
+The public editor preview is independent of these write permissions. Its metadata
+and transliteration drafts stay in browser memory and never update Wikibase.
 
 ## Primary references
 
@@ -142,3 +162,4 @@ allowlist and exact target allowlist, and editing defaults to disabled.
 - [MediaWiki revisions API](https://www.mediawiki.org/wiki/API:Revisions)
 - [MediaWiki edit API](https://www.mediawiki.org/wiki/API:Edit)
 - [OAuth for MediaWiki developers](https://www.mediawiki.org/wiki/OAuth/For_Developers)
+- [OAuth identity statement implementation](https://github.com/wikimedia/mediawiki-extensions-OAuth/blob/REL1_43/src/UserStatementProvider.php)

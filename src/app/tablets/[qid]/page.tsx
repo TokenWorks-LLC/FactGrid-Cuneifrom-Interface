@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { ArrowLeft, ExternalLink, FileText, ImageIcon, LockKeyhole } from "lucide-react";
+import { ArrowLeft, ExternalLink, FileText, ImageIcon, LockKeyhole, PencilLine } from "lucide-react";
 
 import { EditionComparison } from "@/components/edition-comparison";
 import { EditionEditGate } from "@/components/edition-edit-gate";
@@ -78,15 +78,24 @@ export default async function TabletPage({ params }: TabletPageProps) {
                 <p className="mt-5 text-sm text-muted-foreground">No description recorded in FactGrid.</p>
               )}
             </div>
-            <a
-              className="focus-ring inline-flex min-h-11 items-center gap-2 self-start text-sm font-semibold underline decoration-primary/35 underline-offset-4 hover:decoration-primary lg:self-auto"
-              href={tablet.factGridUrl}
-              rel="noreferrer"
-              target="_blank"
-            >
-              Open authoritative record
-              <ExternalLink aria-hidden="true" className="size-4" />
-            </a>
+            <div className="flex flex-col items-start gap-2">
+              <Link
+                className="focus-ring inline-flex min-h-11 items-center gap-2 border border-primary bg-primary px-4 text-sm font-medium text-primary-foreground hover:bg-primary/85"
+                href={`/tablets/${tablet.qid}/edit`}
+              >
+                <PencilLine aria-hidden="true" className="size-4" />
+                Preview editor
+              </Link>
+              <a
+                className="focus-ring inline-flex min-h-11 items-center gap-2 self-start text-sm font-semibold underline decoration-primary/35 underline-offset-4 hover:decoration-primary lg:self-auto"
+                href={tablet.factGridUrl}
+                rel="noreferrer"
+                target="_blank"
+              >
+                Open authoritative record
+                <ExternalLink aria-hidden="true" className="size-4" />
+              </a>
+            </div>
           </div>
         </div>
       </header>

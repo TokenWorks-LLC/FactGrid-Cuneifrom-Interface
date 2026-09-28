@@ -9,14 +9,17 @@ The MVP provides:
 - membership-restricted tablet search with collection, findspot, and period filters;
 - stable QID-based record pages with metadata, source-separated editions, image links, and external transcript links;
 - safe plain-text display of supported FactGrid document pages;
-- FactGrid OAuth 2 authorization-code sign-in with PKCE and server-side sessions;
+- FactGrid OAuth 1.0a sign-in and signed API requests, with existing OAuth 2 support retained;
+- a public editor preview with metadata and transliteration drafts;
 - a deliberately narrow editor for one verified plain `D-Q…` transcript region;
 - fail-closed editing when OAuth, editor policy, or target allowlists are absent.
 
 OAuth and live writes are implemented and contract-tested, but are not configured
 or claimed as live-verified. They require a FactGrid-approved OAuth consumer, an
 approved editor policy, and a designated write-test record. Public reading works
-without authentication.
+without authentication. The preview is also public: choose **Preview editor** on
+any tablet, or visit `/tablets/QID/edit`. Drafts stay in the current browser page
+and do not change FactGrid. Metadata saving is not implemented in this release.
 
 ## Quick start
 
@@ -29,7 +32,7 @@ npm run dev
 ```
 
 Open <http://127.0.0.1:3000>. The default empty OAuth settings intentionally put
-the site in reading mode. The shared desktop/mobile header still shows
+the site in public browsing and editor-preview mode. The shared desktop/mobile header still shows
 `Log in with FactGrid`, marked `Unavailable`; it links to an explanation instead
 of a failing API response. With complete OAuth configuration the same entry starts
 the real provider flow and returns to the validated internal page. A signed-in
@@ -62,7 +65,9 @@ through a local TLS reverse proxy. It verifies non-root execution, private
 SQLite/WAL permissions, session survival across container replacement, logout
 survival across a second replacement, and required response headers. It requires
 a running Docker daemon plus the locally installed Playwright Chromium binary;
-it never contacts a live OAuth provider or performs a scholarly write.
+it never contacts a live OAuth provider or performs a scholarly write. The harness
+defaults to OAuth 1.0a; set `FACTGRID_DOCKER_OAUTH_VERSION=2.0` to verify the legacy
+flow. CI runs both protocols.
 
 Playwright needs Chromium once on a new machine:
 
@@ -81,7 +86,7 @@ npx playwright install chromium             # macOS/Windows
 
 ## Scope
 
-This release does not provide maps, 3D viewing, tablet creation, metadata edits,
+This release does not provide maps, 3D viewing, tablet creation, saved metadata edits,
 uploads, annotation workflows, advanced linguistic search, a local scholarly
 database, or local revision history. Unsupported document formats remain readable
 where possible and link back to their source; they are never flattened into a

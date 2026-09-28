@@ -2,45 +2,60 @@ import Database from "better-sqlite3";
 import { chmodSync, closeSync, mkdirSync, openSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 
-import { SESSION_TTL_SECONDS } from "./constants";
+import { OAUTH_TRANSACTION_TTL_SECONDS, SESSION_TTL_SECONDS } from "./constants";
+import { sanitizeReturnPath } from "./config";
 import { hashOpaqueToken, openString, randomOpaqueToken, sealString } from "./crypto";
 
 export interface NewSession {
+  oauthVersion?: "1.0a" | "2.0";
   providerUserId: string;
   username: string;
   accessToken: string;
+  accessTokenSecret?: string | null;
   refreshToken?: string | null;
   accessTokenExpiresAt?: number | null;
 }
 
 export interface StoredSession {
+  oauthVersion?: "1.0a" | "2.0";
   providerUserId: string;
   username: string;
   accessToken: string;
+  accessTokenSecret?: string | null;
   refreshToken: string | null;
   accessTokenExpiresAt: number | null;
   expiresAt: number;
   csrfToken: string;
 }
 
-export type SessionSummary = Omit<StoredSession, "accessToken" | "refreshToken">;
+export type SessionSummary = Omit<StoredSession, "accessToken" | "accessTokenSecret" | "refreshToken">;
+
+export interface OAuth1Transaction {
+  requestToken: string;
+  requestTokenSecret: string;
+  returnTo: string;
+  clientId: string;
+  callbackUrl: string;
+}
 
 export interface CreatedSession extends StoredSession {
   token: string;
 }
 
 interface SessionRow {
+  oauth_version: "1.0a" | "2.0";
   id_hash: string;
   provider_user_id: string;
   username: string;
   access_token: string;
+  access_token_secret: string | null;
   refresh_token: string | null;
   access_token_expires_at: number | null;
   expires_at: number;
   csrf_token: string;
 }
 
-function tokenPurpose(kind: "access" | "refresh", idHash: string): string {
+function tokenPurpose(kind: "access" | "access-secret" | "refresh", idHash: string): string {
   return `provider-${kind}-token:${idHash}`;
 }
 
@@ -81,7 +96,22 @@ export class SessionStore {
       );
       CREATE INDEX IF NOT EXISTS auth_sessions_expires_at
         ON auth_sessions (expires_at);
+      CREATE TABLE IF NOT EXISTS auth_oauth1_transactions (
+        id_hash TEXT PRIMARY KEY,
+        payload TEXT NOT NULL,
+        expires_at INTEGER NOT NULL
+      );
+      CREATE INDEX IF NOT EXISTS auth_oauth1_transactions_expires_at
+        ON auth_oauth1_transactions (expires_at);
     `);
+    // Preserve existing OAuth 2 sessions when upgrading the persistent volume.
+    const columns = this.database.pragma("table_info(auth_sessions)") as Array<{ name: string }>;
+    if (!columns.some((column) => column.name === "oauth_version")) {
+      this.database.exec("ALTER TABLE auth_sessions ADD COLUMN oauth_version TEXT NOT NULL DEFAULT '2.0'");
+    }
+    if (!columns.some((column) => column.name === "access_token_secret")) {
+      this.database.exec("ALTER TABLE auth_sessions ADD COLUMN access_token_secret TEXT");
+    }
   }
 
   static open(path: string, secret: string): SessionStore {
@@ -89,6 +119,9 @@ export class SessionStore {
   }
 
   create(input: NewSession, now = Date.now()): CreatedSession {
+    if (input.oauthVersion === "1.0a" && !input.accessTokenSecret) {
+      throw new Error("An OAuth 1.0a session requires a token secret");
+    }
     this.cleanupExpired(now);
     // One active application session per FactGrid identity limits session-table
     // growth and makes a fresh login revoke the prior browser session.
@@ -114,13 +147,17 @@ export class SessionStore {
     const refreshToken = input.refreshToken
       ? sealString(input.refreshToken, this.secret, tokenPurpose("refresh", idHash))
       : null;
+    const accessTokenSecret = input.accessTokenSecret
+      ? sealString(input.accessTokenSecret, this.secret, tokenPurpose("access-secret", idHash))
+      : null;
 
     this.database
       .prepare(
         `INSERT INTO auth_sessions (
           id_hash, provider_user_id, username, access_token, refresh_token,
-          access_token_expires_at, expires_at, csrf_token, created_at, updated_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          access_token_expires_at, expires_at, csrf_token, created_at, updated_at,
+          oauth_version, access_token_secret
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       )
       .run(
         idHash,
@@ -133,10 +170,14 @@ export class SessionStore {
         csrfToken,
         now,
         now,
+        input.oauthVersion ?? "2.0",
+        accessTokenSecret,
       );
 
     return {
       ...input,
+      oauthVersion: input.oauthVersion ?? "2.0",
+      accessTokenSecret: input.accessTokenSecret ?? null,
       refreshToken: input.refreshToken ?? null,
       accessTokenExpiresAt: input.accessTokenExpiresAt ?? null,
       token,
@@ -152,6 +193,7 @@ export class SessionStore {
 
     try {
       return {
+        oauthVersion: row.oauth_version,
         providerUserId: row.provider_user_id,
         username: row.username,
         accessToken: openString(
@@ -159,6 +201,9 @@ export class SessionStore {
           this.secret,
           tokenPurpose("access", idHash),
         ),
+        accessTokenSecret: row.access_token_secret
+          ? openString(row.access_token_secret, this.secret, tokenPurpose("access-secret", idHash))
+          : null,
         refreshToken: row.refresh_token
           ? openString(
               row.refresh_token,
@@ -183,6 +228,7 @@ export class SessionStore {
     const resolved = this.resolveRow(token, now);
     if (!resolved) return null;
     return {
+      oauthVersion: resolved.row.oauth_version,
       providerUserId: resolved.row.provider_user_id,
       username: resolved.row.username,
       accessTokenExpiresAt: resolved.row.access_token_expires_at,
@@ -263,8 +309,43 @@ export class SessionStore {
   }
 
   cleanupExpired(now = Date.now()): number {
+    this.database.prepare("DELETE FROM auth_oauth1_transactions WHERE expires_at <= ?").run(now);
     return this.database.prepare("DELETE FROM auth_sessions WHERE expires_at <= ?").run(now)
       .changes;
+  }
+
+  createOAuth1Transaction(input: OAuth1Transaction, now = Date.now()): string {
+    this.cleanupExpired(now);
+    const { count } = this.database.prepare("SELECT COUNT(*) AS count FROM auth_oauth1_transactions")
+      .get() as { count: number };
+    if (count >= 10_000) throw new Error("The sign-in transaction limit has been reached");
+    const browserToken = randomOpaqueToken();
+    const idHash = hashOpaqueToken(browserToken);
+    const payload = sealString(JSON.stringify(input), this.secret, `oauth1-transaction:${idHash}`);
+    this.database.prepare(
+      "INSERT INTO auth_oauth1_transactions (id_hash, payload, expires_at) VALUES (?, ?, ?)",
+    ).run(idHash, payload, now + OAUTH_TRANSACTION_TTL_SECONDS * 1000);
+    return browserToken;
+  }
+
+  consumeOAuth1Transaction(token: string | undefined, now = Date.now()): OAuth1Transaction | null {
+    if (!token || !/^[A-Za-z0-9_-]{43}$/u.test(token)) return null;
+    const idHash = hashOpaqueToken(token);
+    // Atomic DELETE RETURNING makes a replay fail even if the original browser
+    // cookie is copied, or two callbacks arrive concurrently.
+    const row = this.database.prepare(
+      "DELETE FROM auth_oauth1_transactions WHERE id_hash = ? RETURNING payload, expires_at",
+    ).get(idHash) as { payload: string; expires_at: number } | undefined;
+    if (!row || row.expires_at <= now) return null;
+    try {
+      const value = JSON.parse(openString(row.payload, this.secret, `oauth1-transaction:${idHash}`));
+      if (!value || typeof value !== "object" ||
+        ["requestToken", "requestTokenSecret", "returnTo", "clientId", "callbackUrl"]
+          .some((field) => typeof value[field] !== "string" || !value[field])) return null;
+      return { ...value, returnTo: sanitizeReturnPath(value.returnTo) };
+    } catch {
+      return null;
+    }
   }
 
   close(): void {

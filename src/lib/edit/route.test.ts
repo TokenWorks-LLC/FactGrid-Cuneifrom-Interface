@@ -10,6 +10,7 @@ const mocks = vi.hoisted(() => ({
   isApprovedEditor: vi.fn(),
   fetchFactGridProfile: vi.fn(),
   saveTranscript: vi.fn(),
+  createMediaWikiEditClient: vi.fn(() => ({ inspectEdition: vi.fn(), submitEdit: vi.fn() })),
 }));
 
 vi.mock("server-only", () => ({}));
@@ -50,7 +51,10 @@ vi.mock("@/lib/auth/session", () => ({
   readSessionToken: mocks.readSessionToken,
   clearSessionCookie: mocks.clearSessionCookie,
 }));
-vi.mock("@/lib/edit/factgrid-write", () => ({ saveTranscript: mocks.saveTranscript }));
+vi.mock("@/lib/edit/factgrid-write", () => ({
+  saveTranscript: mocks.saveTranscript,
+  createMediaWikiEditClient: mocks.createMediaWikiEditClient,
+}));
 
 import { PUT } from "@/app/api/tablets/[qid]/editions/[editionId]/route";
 
@@ -182,6 +186,7 @@ describe("transcript write route authorization", () => {
     });
     expect(mocks.saveTranscript).toHaveBeenCalledWith(
       expect.objectContaining({ qid: "Q42", editionId: "Q42$A1-B2" }),
+      expect.objectContaining({ mediaWiki: expect.any(Object) }),
     );
   });
 });

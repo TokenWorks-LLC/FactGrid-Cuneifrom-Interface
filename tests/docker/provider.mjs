@@ -1,4 +1,4 @@
-import { createHash } from "node:crypto";
+import { createHash, createHmac, timingSafeEqual } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { request as proxyRequest } from "node:http";
 import { createServer } from "node:https";
@@ -15,6 +15,15 @@ const certificate = readFileSync("/fixture/server.crt");
 const privateKey = readFileSync("/fixture/server.key");
 const authorizationCodes = new Map();
 let codeSequence = 0;
+const requestTokens = new Map();
+const usedNonces = new Set();
+const oauth1Audit = { initiate: 0, token: 0, identify: 0 };
+let requestTokenSequence = 0;
+const consumerKey = "synthetic-consumer";
+const consumerSecret = "synthetic-consumer-secret";
+const accessToken = "synthetic-access-token";
+const accessSecret = "synthetic-access-secret/%+=";
+const callbackUrl = "https://app.factgrid.test/api/auth/callback";
 
 const labels = {
   Q102135: "centimetre",
@@ -60,6 +69,123 @@ async function readForm(request) {
   return new URLSearchParams(Buffer.concat(chunks).toString("utf8"));
 }
 
+// This fixture deliberately does not import the application's OAuth library.
+// Verify the wire signature independently, including URL and form parameters.
+function percentEncode(value) {
+  return encodeURIComponent(value).replace(/[!'()*]/gu, (character) =>
+    `%${character.charCodeAt(0).toString(16).toUpperCase()}`,
+  );
+}
+
+function verifyOAuth1(request, url, expectedToken, tokenSecret = "", form = new URLSearchParams()) {
+  const header = request.headers.authorization ?? "";
+  if (!header.startsWith("OAuth ")) throw new Error("OAuth header is required");
+  const oauth = new Map();
+  for (const component of header.slice(6).split(/,\s*/u)) {
+    const match = component.trim().match(/^([A-Za-z_]+)="([^"\\]*)"$/u);
+    if (!match) throw new Error("Malformed OAuth header");
+    const key = decodeURIComponent(match[1]);
+    if (oauth.has(key)) throw new Error("Duplicate OAuth parameter");
+    oauth.set(key, decodeURIComponent(match[2]));
+  }
+  const nonce = oauth.get("oauth_nonce");
+  const timestamp = oauth.get("oauth_timestamp") ?? "";
+  if (
+    oauth.get("oauth_consumer_key") !== consumerKey ||
+    oauth.get("oauth_signature_method") !== "HMAC-SHA1" ||
+    (oauth.has("oauth_version") && oauth.get("oauth_version") !== "1.0") ||
+    (oauth.get("oauth_token") ?? null) !== expectedToken ||
+    !nonce ||
+    !/^\d+$/u.test(timestamp) ||
+    Math.abs(Number(timestamp) - Math.floor(Date.now() / 1_000)) > 300
+  ) {
+    throw new Error("Invalid OAuth parameters");
+  }
+  const parameters = [
+    ...url.searchParams,
+    ...form,
+    ...[...oauth].filter(([name]) => name !== "oauth_signature" && name !== "realm"),
+  ].map(([name, value]) => [percentEncode(name), percentEncode(value)]);
+  parameters.sort(([leftName, leftValue], [rightName, rightValue]) =>
+    leftName === rightName
+      ? (leftValue < rightValue ? -1 : leftValue > rightValue ? 1 : 0)
+      : (leftName < rightName ? -1 : 1),
+  );
+  const normalized = parameters.map(([name, value]) => `${name}=${value}`).join("&");
+  const base = [request.method, `${url.origin}${url.pathname}`, normalized].map(percentEncode).join("&");
+  const expected = createHmac("sha1", `${percentEncode(consumerSecret)}&${percentEncode(tokenSecret)}`)
+    .update(base)
+    .digest("base64");
+  const supplied = oauth.get("oauth_signature") ?? "";
+  if (
+    Buffer.byteLength(supplied) !== Buffer.byteLength(expected) ||
+    !timingSafeEqual(Buffer.from(supplied), Buffer.from(expected))
+  ) {
+    throw new Error("Invalid OAuth signature");
+  }
+  const nonceKey = `${expectedToken ?? ""}|${timestamp}|${nonce}`;
+  if (usedNonces.has(nonceKey)) throw new Error("Replayed OAuth nonce");
+  usedNonces.add(nonceKey);
+  return oauth;
+}
+
+function signedIdentity(nonce) {
+  const now = Math.floor(Date.now() / 1_000);
+  const header = Buffer.from(JSON.stringify({ alg: "HS256", typ: "JWT" })).toString("base64url");
+  const payload = Buffer.from(JSON.stringify({
+    // MediaWiki's UserStatementProvider uses CanonicalServer, including HTTPS.
+    iss: "https://database.factgrid.de",
+    aud: consumerKey,
+    nonce,
+    iat: now,
+    exp: now + 100,
+    sub: "9001",
+    username: "Docker Fixture Editor",
+    blocked: false,
+    groups: ["user"],
+    rights: ["read", "edit"],
+  })).toString("base64url");
+  const signature = createHmac("sha256", consumerSecret).update(`${header}.${payload}`).digest("base64url");
+  return `${header}.${payload}.${signature}`;
+}
+
+function handleOAuth1(request, url, response) {
+  const endpoint = url.searchParams.get("title");
+  try {
+    if (endpoint === "Special:OAuth/initiate") {
+      verifyOAuth1(request, url, null);
+      if (url.searchParams.get("oauth_callback") !== "oob") throw new Error("Expected exact registered callback");
+      const key = `synthetic-request-token-${++requestTokenSequence}`;
+      const secret = `synthetic-request-secret/${requestTokenSequence}%+=`;
+      requestTokens.set(key, { secret, authorized: false, verifier: null });
+      oauth1Audit.initiate += 1;
+      sendJson(response, 200, { key, secret });
+      return;
+    }
+    if (endpoint === "Special:OAuth/token") {
+      const token = /(?:^|,\s*)oauth_token="([^"]+)"/u.exec((request.headers.authorization ?? "").slice(6));
+      const key = token ? decodeURIComponent(token[1]) : "";
+      const transaction = requestTokens.get(key);
+      if (!transaction || !transaction.authorized) throw new Error("Unknown request token");
+      verifyOAuth1(request, url, key, transaction.secret);
+      if (url.searchParams.get("oauth_verifier") !== transaction.verifier) throw new Error("Invalid verifier");
+      requestTokens.delete(key);
+      oauth1Audit.token += 1;
+      sendJson(response, 200, { key: accessToken, secret: accessSecret });
+      return;
+    }
+    if (endpoint === "Special:OAuth/identify") {
+      const oauth = verifyOAuth1(request, url, accessToken, accessSecret);
+      oauth1Audit.identify += 1;
+      send(response, 200, signedIdentity(oauth.get("oauth_nonce")), { "content-type": "application/jwt" });
+      return;
+    }
+    sendJson(response, 404, { error: "not_found" });
+  } catch {
+    sendJson(response, 401, { error: "invalid_oauth1_request" });
+  }
+}
+
 function handlePublicApi(url, response) {
   if (url.searchParams.get("list") === "search") {
     sendJson(response, 200, {
@@ -101,6 +227,32 @@ const server = createServer({ cert: certificate, key: privateKey }, async (reque
 
     if (request.method === "GET" && url.pathname === "/health") {
       send(response, 200, "ok", { "content-type": "text/plain; charset=utf-8" });
+      return;
+    }
+
+    if (request.method === "GET" && url.pathname === "/fixture/oauth1-audit") {
+      sendJson(response, 200, oauth1Audit);
+      return;
+    }
+
+    if (request.method === "GET" && url.pathname === "/w/index.php") {
+      handleOAuth1(request, url, response);
+      return;
+    }
+
+    if (request.method === "GET" && url.pathname === "/wiki/Special:OAuth/authorize") {
+      const key = url.searchParams.get("oauth_token");
+      const transaction = key ? requestTokens.get(key) : null;
+      if (url.searchParams.get("oauth_consumer_key") !== consumerKey || !transaction || transaction.authorized) {
+        sendJson(response, 400, { error: "invalid_request_token" });
+        return;
+      }
+      transaction.authorized = true;
+      transaction.verifier = `synthetic-verifier-${requestTokenSequence}`;
+      const location = new URL(callbackUrl);
+      location.searchParams.set("oauth_token", key);
+      location.searchParams.set("oauth_verifier", transaction.verifier);
+      send(response, 302, "", { location: location.href });
       return;
     }
 
