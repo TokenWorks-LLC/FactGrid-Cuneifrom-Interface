@@ -75,6 +75,16 @@ describe("FactGrid entity adapters", () => {
 
     expect(adaptTabletEntity(entity).inventoryNumbers).toEqual(["I 437"]);
   });
+
+  it("preserves a bounded provider-owned lower-case statement GUID", () => {
+    const response = entityFixture("entity-multiple-editions.json");
+    const entity = response.entities!.Q9000002;
+    entity.claims!.P251![0].id = "q9000002$historical_guid.with-provider-punctuation";
+
+    expect(adaptTabletEntity(entity).editions[0].editionId).toBe(
+      "q9000002$historical_guid.with-provider-punctuation",
+    );
+  });
 });
 
 describe("FactGrid document trust boundary", () => {

@@ -53,6 +53,7 @@ describe("logout route", () => {
     const response = await POST(request());
 
     expect(response.status).toBe(403);
+    await expect(response.json()).resolves.toMatchObject({ signedOut: false });
     expect(mocks.getSessionStore).not.toHaveBeenCalled();
   });
 
@@ -66,6 +67,7 @@ describe("logout route", () => {
     const response = await POST(request());
 
     expect(response.status).toBe(403);
+    await expect(response.json()).resolves.toMatchObject({ signedOut: false });
     expect(mocks.clearSessionCookie).not.toHaveBeenCalled();
   });
 
@@ -77,6 +79,10 @@ describe("logout route", () => {
     const response = await POST(request());
 
     expect(response.status).toBe(503);
+    await expect(response.json()).resolves.toMatchObject({
+      signedOut: true,
+      serverSessionRevoked: false,
+    });
     expect(mocks.clearSessionCookie).toHaveBeenCalledWith(
       response,
       expect.objectContaining({ secureCookies: true }),
@@ -92,7 +98,11 @@ describe("logout route", () => {
 
     const response = await POST(request());
 
-    expect(response.status).toBe(204);
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toEqual({
+      signedOut: true,
+      serverSessionRevoked: true,
+    });
     expect(store.delete).toHaveBeenCalledWith("opaque-session");
     expect(mocks.clearSessionCookie).toHaveBeenCalledWith(
       response,
@@ -112,6 +122,10 @@ describe("logout route", () => {
     const response = await POST(request());
 
     expect(response.status).toBe(503);
+    await expect(response.json()).resolves.toMatchObject({
+      signedOut: true,
+      serverSessionRevoked: false,
+    });
     expect(mocks.clearSessionCookie).toHaveBeenCalledWith(
       response,
       expect.objectContaining({ secureCookies: true }),

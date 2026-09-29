@@ -39,6 +39,7 @@ describe("getAuthConfiguration", () => {
     expect(result.config.oauth.profileEndpoint).toBe(FACTGRID_OAUTH_PROFILE_URL);
     expect(result.config.callbackUrl).toBe(completeEnvironment.FACTGRID_OAUTH_CALLBACK_URL);
     expect(result.config.contributorPolicy).toBe("restricted");
+    expect(result.config.trustProxy).toBe(false);
   });
 
   it("requires separate consumer credentials when OAuth 1.0a is selected", () => {
@@ -87,6 +88,17 @@ describe("getAuthConfiguration", () => {
       ...completeEnvironment,
       FACTGRID_CONTRIBUTOR_POLICY: "open",
     })).toMatchObject({ available: false, invalid: ["FACTGRID_CONTRIBUTOR_POLICY"] });
+  });
+
+  it("requires an explicit boolean before trusting proxy identity headers", () => {
+    expect(getAuthConfiguration({
+      ...completeEnvironment,
+      FACTGRID_TRUST_PROXY: "true",
+    })).toMatchObject({ available: true, config: { trustProxy: true } });
+    expect(getAuthConfiguration({
+      ...completeEnvironment,
+      FACTGRID_TRUST_PROXY: "yes",
+    })).toMatchObject({ available: false, invalid: ["FACTGRID_TRUST_PROXY"] });
   });
 });
 

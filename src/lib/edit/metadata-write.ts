@@ -7,6 +7,7 @@ import type {
   PropertyId,
   Qid,
   WikibaseEntity,
+  WikibaseReference,
   WikibaseSnak,
   WikibaseStatement,
 } from "@/lib/factgrid/types";
@@ -20,6 +21,7 @@ import type {
   MetadataValue,
   MetadataWriteRequest,
 } from "./metadata-request";
+import { isWikibaseEditEntityComment } from "./wikibase-comment";
 
 type ServerFetch = typeof globalThis.fetch;
 
@@ -396,7 +398,7 @@ export function createMetadataMutationClient(
     accessToken: string,
     qid: Qid,
     revisionId: number,
-    summary: string,
+    _summary: string,
     inspection: MetadataInspection,
   ): Promise<void> {
     const response = await request<RevisionResponse>(
@@ -412,14 +414,18 @@ export function createMetadataMutationClient(
       }),
       accessToken,
     );
-    const revision = response.query?.pages?.[0]?.revisions?.[0];
-    const effectiveSummary = summary.trim() || "Update tablet metadata via FactGrid Cuneiform Interface";
+    const pages = response.query?.pages;
+    const page = Array.isArray(pages) && pages.length === 1 ? pages[0] : undefined;
+    const revision = page?.revisions?.[0];
     if (
       response.error ||
+      page?.ns !== 120 ||
+      page.title !== `Item:${qid}` ||
+      page.revisions?.length !== 1 ||
       revision?.revid !== revisionId ||
       revision.user !== inspection.expectedUsername ||
       String(revision.userid) !== inspection.expectedUserId ||
-      revision.comment !== effectiveSummary
+      !isWikibaseEditEntityComment(revision.comment)
     ) {
       throw metadataError(
         "save_confirmation_failed",
@@ -483,6 +489,13 @@ function assertSnak(
   if (mapProperty && snak.property !== mapProperty) {
     throw metadataError("invalid_request", "A qualifier or reference snak used the wrong property key.", 400);
   }
+  if (snak.property === FACTGRID_PROPERTIES.documentPage) {
+    throw metadataError(
+      "invalid_request",
+      "FactGrid document links are managed by the transcription workflow.",
+      400,
+    );
+  }
   const definition = snapshot.properties[snak.property as PropertyId];
   if (!definition) {
     throw metadataError("invalid_request", `No current FactGrid definition was loaded for ${snak.property}.`, 400);
@@ -539,6 +552,34 @@ function statementById(entity: WikibaseEntity, id: string): WikibaseStatement | 
     if (found) return found;
   }
   return undefined;
+}
+
+function statementIdBelongsToEntity(id: string, qid: Qid): boolean {
+  const separator = id.indexOf("$");
+  return (
+    separator > 0 &&
+    separator < id.length - 1 &&
+    id.slice(0, separator).toUpperCase() === qid
+  );
+}
+
+function wikibaseStatementContainsProperty(
+  statement: WikibaseStatement,
+  property: string,
+): boolean {
+  if (statement.mainsnak?.property === property) return true;
+  if (
+    Object.values(statement.qualifiers ?? {}).some((snaks) =>
+      snaks.some((snak) => snak.property === property)
+    )
+  ) {
+    return true;
+  }
+  return (statement.references ?? []).some((reference) =>
+    Object.values(reference.snaks ?? {}).some((snaks) =>
+      snaks.some((snak) => snak.property === property)
+    )
+  );
 }
 
 function statementRemovesData(current: WikibaseStatement, next: MetadataStatement): boolean {
@@ -677,6 +718,7 @@ function validateOperations(
 ): void {
   const operationKeys = new Set<string>();
   const claimIds = new Set<string>();
+  const newStatements: MetadataStatement[] = [];
   for (const operation of request.operations) {
     let key: string;
     if (operation.type === "set-label" || operation.type === "set-description") {
@@ -700,12 +742,12 @@ function validateOperations(
     operationKeys.add(key);
 
     if (operation.type === "remove-statement") {
-      if (!operation.statementId.startsWith(`${qid}$`)) {
+      if (!statementIdBelongsToEntity(operation.statementId, qid)) {
         throw metadataError("invalid_request", "The statement does not belong to this tablet.", 400);
       }
       const current = statementById(snapshot.entity, operation.statementId);
       if (!current) throw metadataError("edit_conflict", "The statement no longer exists on this tablet.", 409);
-      if (current.mainsnak?.property === FACTGRID_PROPERTIES.documentPage) {
+      if (wikibaseStatementContainsProperty(current, FACTGRID_PROPERTIES.documentPage)) {
         throw metadataError("invalid_request", "FactGrid document links are managed by the transcription workflow.", 400);
       }
       if (!request.confirmCatalogueRemoval && statementRemovesCatalogueMembership(current)) {
@@ -747,52 +789,102 @@ function validateOperations(
       if (hasExistingHash) {
         throw metadataError("invalid_request", "New statements cannot reuse existing hashes.", 400);
       }
+      if (
+        newStatements.some((current) =>
+          sameJson(requestStatementSubstance(current), requestStatementSubstance(statement))
+        )
+      ) {
+        throw metadataError(
+          "invalid_request",
+          "The same new metadata statement was added more than once.",
+          400,
+        );
+      }
+      const currentStatements = snapshot.entity.claims?.[statement.mainsnak.property] ?? [];
+      if (
+        currentStatements.some((current) =>
+          sameJson(normalizeStatementSubstance(current), requestStatementSubstance(statement))
+        )
+      ) {
+        throw metadataError(
+          "invalid_request",
+          "This metadata statement already exists on the tablet.",
+          400,
+        );
+      }
+      newStatements.push(statement);
       continue;
     }
-    if (!statement.id.startsWith(`${qid}$`) || claimIds.has(statement.id)) {
+    if (!statementIdBelongsToEntity(statement.id, qid) || claimIds.has(statement.id)) {
       throw metadataError("invalid_request", "The statement identifier is invalid or duplicated.", 400);
     }
     claimIds.add(statement.id);
     const current = statementById(snapshot.entity, statement.id);
     if (!current) throw metadataError("edit_conflict", "The statement no longer exists on this tablet.", 409);
+    if (wikibaseStatementContainsProperty(current, FACTGRID_PROPERTIES.documentPage)) {
+      throw metadataError("invalid_request", "FactGrid document links are managed by the transcription workflow.", 400);
+    }
     if (current.mainsnak?.property !== statement.mainsnak.property) {
       throw metadataError("invalid_request", "An existing statement cannot be moved to another property.", 400);
     }
-    const currentSnakHashes = new Set<string>();
-    if (current.mainsnak?.hash) currentSnakHashes.add(current.mainsnak.hash);
-    for (const snaks of Object.values(current.qualifiers ?? {})) {
-      for (const snak of snaks) if (snak.hash) currentSnakHashes.add(snak.hash);
+    if (statement.mainsnak.hash !== undefined && statement.mainsnak.hash !== current.mainsnak?.hash) {
+      throw metadataError("invalid_request", "The mainsnak hash does not belong to this statement value.", 400);
     }
-    for (const reference of current.references ?? []) {
-      for (const snaks of Object.values(reference.snaks ?? {})) {
-        for (const snak of snaks) if (snak.hash) currentSnakHashes.add(snak.hash);
+
+    const consumeHashes = (
+      submitted: readonly MetadataSnak[],
+      available: readonly WikibaseSnak[],
+      message: string,
+    ): void => {
+      const counts = new Map<string, number>();
+      for (const snak of available) {
+        if (snak.hash) counts.set(snak.hash, (counts.get(snak.hash) ?? 0) + 1);
       }
+      for (const snak of submitted) {
+        if (!snak.hash) continue;
+        const remaining = counts.get(snak.hash) ?? 0;
+        if (remaining <= 0) throw metadataError("invalid_request", message, 400);
+        counts.set(snak.hash, remaining - 1);
+      }
+    };
+
+    for (const [property, snaks] of Object.entries(statement.qualifiers)) {
+      consumeHashes(
+        snaks,
+        current.qualifiers?.[property] ?? [],
+        "A qualifier hash does not belong to this statement property.",
+      );
     }
-    const currentReferenceHashes = new Set(
-      (current.references ?? []).flatMap((reference) =>
-        reference.hash ? [reference.hash] : [],
-      ),
-    );
-    const submittedSnakHashes = [
-      statement.mainsnak.hash,
-      ...Object.values(statement.qualifiers).flatMap((snaks) =>
-        snaks.map((snak) => snak.hash),
-      ),
-      ...statement.references.flatMap((reference) =>
-        Object.values(reference.snaks).flatMap((snaks) =>
-          snaks.map((snak) => snak.hash),
-        ),
-      ),
-    ].filter((hash): hash is string => Boolean(hash));
-    if (submittedSnakHashes.some((hash) => !currentSnakHashes.has(hash))) {
-      throw metadataError("invalid_request", "A qualifier hash does not belong to this statement.", 400);
+
+    const currentReferencesByHash = new Map<string, WikibaseReference[]>();
+    for (const reference of current.references ?? []) {
+      if (!reference.hash) continue;
+      const matches = currentReferencesByHash.get(reference.hash) ?? [];
+      matches.push(reference);
+      currentReferencesByHash.set(reference.hash, matches);
     }
-    if (
-      statement.references.some(
-        (reference) => reference.hash && !currentReferenceHashes.has(reference.hash),
-      )
-    ) {
-      throw metadataError("invalid_request", "A reference hash does not belong to this statement.", 400);
+    for (const reference of statement.references) {
+      const submittedNestedHashes = Object.values(reference.snaks).some((snaks) =>
+        snaks.some((snak) => Boolean(snak.hash))
+      );
+      if (!reference.hash) {
+        if (submittedNestedHashes) {
+          throw metadataError("invalid_request", "A new reference cannot reuse existing snak hashes.", 400);
+        }
+        continue;
+      }
+      const candidates = currentReferencesByHash.get(reference.hash);
+      const currentReference = candidates?.shift();
+      if (!currentReference) {
+        throw metadataError("invalid_request", "A reference hash does not belong to this statement.", 400);
+      }
+      for (const [property, snaks] of Object.entries(reference.snaks)) {
+        consumeHashes(
+          snaks,
+          currentReference.snaks?.[property] ?? [],
+          "A reference snak hash does not belong to this reference property.",
+        );
+      }
     }
     if (!request.confirmRemovals && statementRemovesData(current, statement)) {
       throw metadataError("invalid_request", "Removing qualifiers or references requires confirmation.", 400);
@@ -942,6 +1034,30 @@ function requestStatementComparable(statement: MetadataStatement): unknown {
     qualifiers: statement.qualifiers,
     qualifierOrder: statement.qualifierOrder,
     references: statement.references.map(({ snaks, snaksOrder }) => ({ snaks, snaksOrder })),
+  };
+}
+
+function normalizeStatementSubstance(statement: WikibaseStatement): unknown {
+  const comparable = normalizeStatement(statement) as {
+    rank: unknown;
+    mainsnak: unknown;
+    qualifiers: unknown;
+    references: Array<{ snaks: unknown }>;
+  };
+  return {
+    rank: comparable.rank,
+    mainsnak: comparable.mainsnak,
+    qualifiers: comparable.qualifiers,
+    references: comparable.references.map(({ snaks }) => ({ snaks })),
+  };
+}
+
+function requestStatementSubstance(statement: MetadataStatement): unknown {
+  return {
+    rank: statement.rank,
+    mainsnak: statement.mainsnak,
+    qualifiers: statement.qualifiers,
+    references: statement.references.map(({ snaks }) => ({ snaks })),
   };
 }
 
@@ -1120,11 +1236,11 @@ export async function saveMetadata(
       inspection,
     );
   } catch (cause) {
-    if (isTranscriptEditError(cause)) throw cause;
+    if (isTranscriptEditError(cause) && cause.code === "save_confirmation_failed") throw cause;
     throw metadataError(
       "save_confirmation_failed",
       "FactGrid accepted the metadata edit, but the saved entity could not be read back.",
-      502,
+      isTranscriptEditError(cause) && cause.status === 409 ? 409 : 502,
       cause,
     );
   }

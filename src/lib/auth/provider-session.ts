@@ -2,7 +2,7 @@ import "server-only";
 
 import type { AuthConfiguration } from "./config";
 import { refreshProviderTokens } from "./oauth";
-import { getSessionStore } from "./session";
+import { getSessionStore, sessionMatchesConfiguration } from "./session";
 import type { StoredSession } from "./session-store";
 
 export async function getUsableProviderSession(
@@ -13,7 +13,7 @@ export async function getUsableProviderSession(
   const store = getSessionStore(configuration);
   const session = store.get(sessionToken, now);
   if (!session) return null;
-  if ((session.oauthVersion ?? "2.0") !== (configuration.oauthVersion ?? "2.0")) return null;
+  if (!sessionMatchesConfiguration(session, configuration)) return null;
   if (configuration.oauthVersion === "1.0a") {
     return session.accessTokenSecret ? session : null;
   }

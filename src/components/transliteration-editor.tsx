@@ -1,12 +1,13 @@
 "use client";
 
-import { useEffect, useId, useRef, useState } from "react";
+import { useId, useRef, useState } from "react";
 import { AlertTriangle, Check, ExternalLink, LoaderCircle } from "lucide-react";
 
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { readStoredDraft, useDraftProtection } from "@/components/draft-protection";
 
 const SPECIAL_CHARACTERS = ["š", "ṣ", "ṭ", "ḫ", "ā", "ē", "ī", "ū", "ʾ", "₁", "₂", "₃", "₄"];
 
@@ -23,28 +24,50 @@ export type TransliterationEditorProps = {
   editionId: string;
   initialRevision: number;
   csrfToken: string;
+  ownerId: string;
+};
+
+type StoredTranscriptDraft = {
+  text: string;
+  summary: string;
+  uncertainMessage?: string;
 };
 
 export function TransliterationEditor(props: TransliterationEditorProps) {
   const { initialText, historyUrl } = props;
   const editorId = useId();
   const textareaRef = useRef<HTMLTextAreaElement>(null);
-  const [text, setText] = useState(initialText);
+  const scope = `transliteration:${props.qid}:${props.editionId}:${props.initialRevision}`;
+  const [restored] = useState(() => readStoredDraft<StoredTranscriptDraft>(props.ownerId, scope));
+  const [text, setText] = useState(restored?.text ?? initialText);
   const [savedText, setSavedText] = useState(initialText);
   const [revision, setRevision] = useState(props.initialRevision);
-  const [summary, setSummary] = useState("");
-  const [saveState, setSaveState] = useState<SaveState>({ status: "idle" });
+  const [summary, setSummary] = useState(restored?.summary ?? "");
+  const [saveState, setSaveState] = useState<SaveState>(restored?.uncertainMessage
+    ? { status: "unknown", message: restored.uncertainMessage }
+    : { status: "idle" });
   const dirty = text !== savedText;
   const draftChanged = dirty || summary.length > 0;
+  const outcomeLocked = saveState.status === "unknown";
 
-  useEffect(() => {
-    if (!draftChanged) return;
-    const warn = (event: BeforeUnloadEvent) => event.preventDefault();
-    window.addEventListener("beforeunload", warn);
-    return () => window.removeEventListener("beforeunload", warn);
-  }, [draftChanged]);
+  useDraftProtection({
+    ownerId: props.ownerId,
+    scope,
+    dirty: draftChanged,
+    draft: {
+      text,
+      summary,
+      uncertainMessage: saveState.status === "unknown" ? saveState.message : undefined,
+    },
+    onDiscard: () => {
+      setText(savedText);
+      setSummary("");
+      setSaveState({ status: "idle" });
+    },
+  });
 
   function insertCharacter(character: string) {
+    if (outcomeLocked) return;
     const textarea = textareaRef.current;
     if (!textarea) return;
     const start = textarea.selectionStart;
@@ -64,7 +87,7 @@ export function TransliterationEditor(props: TransliterationEditorProps) {
   }
 
   async function save() {
-    if (!dirty || saveState.status === "saving") return;
+    if (!dirty || saveState.status === "saving" || saveState.status === "unknown") return;
     setSaveState({ status: "saving" });
 
     try {
@@ -166,6 +189,7 @@ export function TransliterationEditor(props: TransliterationEditorProps) {
                 key={character}
                 aria-label={`Insert ${character}`}
                 className="size-11 rounded-none font-heading text-base"
+                disabled={outcomeLocked}
                 onClick={() => insertCharacter(character)}
                 size="icon"
                 type="button"
@@ -179,9 +203,10 @@ export function TransliterationEditor(props: TransliterationEditorProps) {
             ref={textareaRef}
             className="transcript-text mt-3 min-h-96 resize-y rounded-none bg-card text-sm leading-6"
             id={`${editorId}-transliteration`}
+            disabled={outcomeLocked}
             onChange={(event) => {
               setText(event.target.value);
-              if (saveState.status !== "idle") setSaveState({ status: "idle" });
+              if (saveState.status !== "idle" && saveState.status !== "unknown") setSaveState({ status: "idle" });
             }}
             spellCheck={false}
             value={text}
@@ -191,6 +216,7 @@ export function TransliterationEditor(props: TransliterationEditorProps) {
             <input
               className="mt-2 h-11 w-full border border-input bg-background px-3 text-sm"
               id={`${editorId}-summary`}
+              disabled={outcomeLocked}
               maxLength={255}
               onChange={(event) => setSummary(event.target.value)}
               placeholder="Briefly describe this change"
@@ -219,7 +245,7 @@ export function TransliterationEditor(props: TransliterationEditorProps) {
       ) : null}
 
       <div className="mt-6 flex flex-wrap items-center gap-3">
-        <Button className="min-h-11 rounded-none" disabled={!dirty || saveState.status === "saving"} onClick={save} type="button">
+        <Button className="min-h-11 rounded-none" disabled={!dirty || saveState.status === "saving" || saveState.status === "unknown"} onClick={save} type="button">
           {saveState.status === "saving" ? (
             <>
               <LoaderCircle aria-hidden="true" className="size-4 animate-spin" />

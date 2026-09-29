@@ -5,9 +5,13 @@ import { createHmac } from "node:crypto";
 import { jwtVerify } from "jose";
 
 import type { AuthConfiguration } from "./config";
+import { readBoundedResponseText } from "./bounded-response";
 import {
   FACTGRID_ORIGIN,
   FACTGRID_OAUTH1_INITIATE_URL,
+  OAUTH_IDENTITY_CLOCK_TOLERANCE_SECONDS,
+  OAUTH_RESPONSE_MAX_BYTES,
+  OAUTH_TOKEN_MAX_BYTES,
   UPSTREAM_TIMEOUT_MS,
 } from "./constants";
 import { randomOpaqueToken, safeEqual } from "./crypto";
@@ -80,12 +84,7 @@ async function signedGet(
     signal: AbortSignal.timeout(UPSTREAM_TIMEOUT_MS),
   });
   if (!response.ok) throw new Error("FactGrid OAuth request failed");
-  const declaredLength = Number(response.headers.get("content-length"));
-  if (Number.isFinite(declaredLength) && declaredLength > 64 * 1024) {
-    throw new Error("FactGrid OAuth response is too large");
-  }
-  const body = await response.text();
-  if (body.length > 64 * 1024) throw new Error("FactGrid OAuth response is too large");
+  const body = await readBoundedResponseText(response, OAUTH_RESPONSE_MAX_BYTES);
   return { body, nonce: signed.nonce };
 }
 
@@ -95,8 +94,10 @@ function parseToken(body: string): OAuth1Token {
   const result = parsed as Record<string, unknown>;
   if (
     result.error ||
-    typeof result.key !== "string" || !result.key || result.key.length > 4096 ||
-    typeof result.secret !== "string" || !result.secret || result.secret.length > 4096
+    typeof result.key !== "string" || !result.key ||
+    Buffer.byteLength(result.key, "utf8") > OAUTH_TOKEN_MAX_BYTES ||
+    typeof result.secret !== "string" || !result.secret ||
+    Buffer.byteLength(result.secret, "utf8") > OAUTH_TOKEN_MAX_BYTES
   ) throw new Error("Invalid OAuth token response");
   return { key: result.key, secret: result.secret };
 }
@@ -152,11 +153,14 @@ export async function identifyOAuth1(
     audience: configuration.clientId,
     requiredClaims: ["iat", "exp", "nonce", "sub"],
     maxTokenAge: 300,
+    clockTolerance: OAUTH_IDENTITY_CLOCK_TOLERANCE_SECONDS,
   });
   const now = Math.floor(Date.now() / 1000);
   if (
-    !Number.isSafeInteger(payload.iat) || payload.iat! > now ||
-    !Number.isSafeInteger(payload.exp) || payload.exp! <= now ||
+    !Number.isSafeInteger(payload.iat) ||
+    payload.iat! > now + OAUTH_IDENTITY_CLOCK_TOLERANCE_SECONDS ||
+    !Number.isSafeInteger(payload.exp) ||
+    payload.exp! <= now - OAUTH_IDENTITY_CLOCK_TOLERANCE_SECONDS ||
     typeof payload.nonce !== "string" || !safeEqual(payload.nonce, nonce)
   ) throw new Error("Invalid FactGrid identity assertion");
   return payload;

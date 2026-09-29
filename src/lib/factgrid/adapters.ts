@@ -82,8 +82,11 @@ function qualifierStringValues(
 }
 
 function safeStatementId(value: string | undefined, qid: Qid): string | undefined {
-  if (!value || value.length > 120) return undefined;
-  return new RegExp(`^${qid}\\$[A-Za-z0-9-]+$`).test(value) ? value : undefined;
+  if (!value || value.length > 200 || /[\u0000-\u001f\u007f]/u.test(value)) return undefined;
+  const separator = value.indexOf("$");
+  return separator > 0 && separator < value.length - 1 && value.slice(0, separator).toUpperCase() === qid
+    ? value
+    : undefined;
 }
 
 function qidFromUnknown(value: unknown): Qid | undefined {

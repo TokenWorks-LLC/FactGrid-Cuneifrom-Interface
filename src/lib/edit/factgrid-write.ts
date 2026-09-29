@@ -13,7 +13,7 @@ import type {
 import { TranscriptEditError, isTranscriptEditError } from "./errors";
 import type { TranscriptWriteRequest } from "./request";
 import type { VerifiedEditorIdentity } from "./authorization";
-import { isAllowedEditTarget, parseAllowedEditTargets } from "./targets";
+import { isEditTargetEnabled, parseAllowedEditTargets } from "./targets";
 
 type ServerFetch = typeof globalThis.fetch;
 
@@ -655,8 +655,7 @@ export async function saveTranscript(
     parseAllowedEditTargets(process.env.FACTGRID_ALLOWED_EDIT_TARGETS);
   if (
     !edition.reference ||
-    (input.contributorPolicy !== "authenticated" &&
-      !isAllowedEditTarget(edition.reference, allowedTargets))
+    !isEditTargetEnabled(edition.reference, input.contributorPolicy ?? "restricted", allowedTargets)
   ) {
     throw new TranscriptEditError(
       "target_not_allowed",

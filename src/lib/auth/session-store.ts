@@ -7,7 +7,9 @@ import { sanitizeReturnPath } from "./config";
 import { hashOpaqueToken, openString, randomOpaqueToken, sealString } from "./crypto";
 
 export interface NewSession {
-  oauthVersion?: "1.0a" | "2.0";
+  oauthVersion: "1.0a" | "2.0";
+  oauthIssuer: string;
+  oauthClientId: string;
   providerUserId: string;
   username: string;
   accessToken: string;
@@ -17,7 +19,9 @@ export interface NewSession {
 }
 
 export interface StoredSession {
-  oauthVersion?: "1.0a" | "2.0";
+  oauthVersion: "1.0a" | "2.0";
+  oauthIssuer: string | null;
+  oauthClientId: string | null;
   providerUserId: string;
   username: string;
   accessToken: string;
@@ -44,6 +48,8 @@ export interface CreatedSession extends StoredSession {
 
 interface SessionRow {
   oauth_version: "1.0a" | "2.0";
+  oauth_issuer: string | null;
+  oauth_client_id: string | null;
   id_hash: string;
   provider_user_id: string;
   username: string;
@@ -92,7 +98,11 @@ export class SessionStore {
         expires_at INTEGER NOT NULL,
         csrf_token TEXT NOT NULL,
         created_at INTEGER NOT NULL,
-        updated_at INTEGER NOT NULL
+        updated_at INTEGER NOT NULL,
+        oauth_version TEXT NOT NULL DEFAULT '2.0',
+        access_token_secret TEXT,
+        oauth_issuer TEXT,
+        oauth_client_id TEXT
       );
       CREATE INDEX IF NOT EXISTS auth_sessions_expires_at
         ON auth_sessions (expires_at);
@@ -112,6 +122,14 @@ export class SessionStore {
     if (!columns.some((column) => column.name === "access_token_secret")) {
       this.database.exec("ALTER TABLE auth_sessions ADD COLUMN access_token_secret TEXT");
     }
+    // New registration columns intentionally remain NULL on legacy rows. Such
+    // rows fail closed at the configuration boundary and require a fresh login.
+    if (!columns.some((column) => column.name === "oauth_issuer")) {
+      this.database.exec("ALTER TABLE auth_sessions ADD COLUMN oauth_issuer TEXT");
+    }
+    if (!columns.some((column) => column.name === "oauth_client_id")) {
+      this.database.exec("ALTER TABLE auth_sessions ADD COLUMN oauth_client_id TEXT");
+    }
   }
 
   static open(path: string, secret: string): SessionStore {
@@ -121,6 +139,12 @@ export class SessionStore {
   create(input: NewSession, now = Date.now()): CreatedSession {
     if (input.oauthVersion === "1.0a" && !input.accessTokenSecret) {
       throw new Error("An OAuth 1.0a session requires a token secret");
+    }
+    if (
+      !input.oauthIssuer || input.oauthIssuer.length > 2_048 ||
+      !input.oauthClientId || input.oauthClientId.length > 2_048
+    ) {
+      throw new Error("An OAuth session requires an issuer and client registration");
     }
     this.cleanupExpired(now);
     // One active application session per FactGrid identity limits session-table
@@ -156,8 +180,8 @@ export class SessionStore {
         `INSERT INTO auth_sessions (
           id_hash, provider_user_id, username, access_token, refresh_token,
           access_token_expires_at, expires_at, csrf_token, created_at, updated_at,
-          oauth_version, access_token_secret
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          oauth_version, access_token_secret, oauth_issuer, oauth_client_id
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       )
       .run(
         idHash,
@@ -170,13 +194,15 @@ export class SessionStore {
         csrfToken,
         now,
         now,
-        input.oauthVersion ?? "2.0",
+        input.oauthVersion,
         accessTokenSecret,
+        input.oauthIssuer,
+        input.oauthClientId,
       );
 
     return {
       ...input,
-      oauthVersion: input.oauthVersion ?? "2.0",
+      oauthVersion: input.oauthVersion,
       accessTokenSecret: input.accessTokenSecret ?? null,
       refreshToken: input.refreshToken ?? null,
       accessTokenExpiresAt: input.accessTokenExpiresAt ?? null,
@@ -194,6 +220,8 @@ export class SessionStore {
     try {
       return {
         oauthVersion: row.oauth_version,
+        oauthIssuer: row.oauth_issuer,
+        oauthClientId: row.oauth_client_id,
         providerUserId: row.provider_user_id,
         username: row.username,
         accessToken: openString(
@@ -229,6 +257,8 @@ export class SessionStore {
     if (!resolved) return null;
     return {
       oauthVersion: resolved.row.oauth_version,
+      oauthIssuer: resolved.row.oauth_issuer,
+      oauthClientId: resolved.row.oauth_client_id,
       providerUserId: resolved.row.provider_user_id,
       username: resolved.row.username,
       accessTokenExpiresAt: resolved.row.access_token_expires_at,

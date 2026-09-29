@@ -5,6 +5,7 @@ import { CircleUserRound, LogIn, LogOut } from "lucide-react";
 import { usePathname, useRouter } from "next/navigation";
 
 import { buttonVariants } from "@/components/ui/button";
+import { useDraftNavigation } from "@/components/draft-protection";
 import { cn } from "@/lib/utils";
 
 type SessionStatus =
@@ -25,9 +26,11 @@ function loginHref(returnTo: string): string {
 export function AuthControl() {
   const pathname = usePathname();
   const router = useRouter();
+  const { confirmDiscard, discardAll } = useDraftNavigation();
   const logoutErrorId = useId();
   const [session, setSession] = useState<SessionStatus>({ status: "loading" });
   const [logoutError, setLogoutError] = useState<string | null>(null);
+  const [logoutWarning, setLogoutWarning] = useState<string | null>(null);
   const [loggingOut, setLoggingOut] = useState(false);
 
   useEffect(() => {
@@ -83,7 +86,7 @@ export function AuthControl() {
   }
 
   if (session.status === "unavailable") {
-    return (
+    const unavailableLink = (
       <a
         aria-label="Log in with FactGrid"
         aria-describedby={`${logoutErrorId}-status`}
@@ -105,6 +108,12 @@ export function AuthControl() {
         </span>
       </a>
     );
+    return logoutWarning ? (
+      <div className="grid gap-1">
+        {unavailableLink}
+        <span className="max-w-72 text-xs leading-4 text-destructive" role="alert">{logoutWarning}</span>
+      </div>
+    ) : unavailableLink;
   }
 
   if (session.status === "authenticated") {
@@ -135,6 +144,7 @@ export function AuthControl() {
             "min-h-11 rounded-none px-3",
           )}
           onClick={async () => {
+            if (!confirmDiscard("Discard all unsaved FactGrid drafts and sign out?")) return;
             setLogoutError(null);
             setLoggingOut(true);
             try {
@@ -142,15 +152,25 @@ export function AuthControl() {
                 method: "POST",
                 headers: { "X-CSRF-Token": session.csrfToken },
               });
-              if (response.ok) {
-                setSession({ status: "anonymous", returnTo: "/" });
+              const body = (await response.json().catch(() => ({}))) as {
+                signedOut?: boolean;
+                serverSessionRevoked?: boolean;
+                warning?: string;
+                error?: { message?: string };
+              };
+              if (body.signedOut === true) {
+                discardAll();
+                setLogoutWarning(body.serverSessionRevoked === false
+                  ? (body.warning ?? body.error?.message ?? "You are signed out in this browser, but the server session could not be revoked. Revoke the connected application in FactGrid if needed.")
+                  : null);
+                setSession({
+                  status: "anonymous",
+                  returnTo: "/",
+                });
                 router.push("/");
                 router.refresh();
                 return;
               }
-              const body = (await response.json().catch(() => ({}))) as {
-                error?: { message?: string };
-              };
               setLogoutError(
                 body.error?.message ?? "Sign-out could not be confirmed. Please try again.",
               );
@@ -170,7 +190,7 @@ export function AuthControl() {
     );
   }
 
-  return (
+  const login = (
     <a
       className={cn(
         buttonVariants({ size: "sm", variant: "outline" }),
@@ -199,4 +219,10 @@ export function AuthControl() {
       Log in with FactGrid
     </a>
   );
+  return logoutWarning ? (
+    <div className="grid gap-1">
+      {login}
+      <span className="max-w-72 text-xs leading-4 text-destructive" role="alert">{logoutWarning}</span>
+    </div>
+  ) : login;
 }

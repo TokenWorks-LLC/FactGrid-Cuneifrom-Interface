@@ -6,15 +6,30 @@ const mocks = vi.hoisted(() => ({
 }));
 
 vi.mock("server-only", () => ({}));
-vi.mock("./session", () => ({ getSessionStore: mocks.getSessionStore }));
+vi.mock("./session", () => ({
+  getSessionStore: mocks.getSessionStore,
+  sessionMatchesConfiguration: (
+    session: { oauthVersion: string; oauthIssuer: string | null; oauthClientId: string | null },
+    configuration: AuthConfiguration,
+  ) => session.oauthVersion === (configuration.oauthVersion ?? "2.0") &&
+    session.oauthIssuer === configuration.oauth.issuer &&
+    session.oauthClientId === configuration.clientId,
+}));
 vi.mock("./oauth", () => ({ refreshProviderTokens: mocks.refreshProviderTokens }));
 
 import type { AuthConfiguration } from "./config";
 import { getUsableProviderSession } from "./provider-session";
 
-const configuration = {} as AuthConfiguration;
+const configuration = {
+  oauthVersion: "2.0",
+  clientId: "fixture-client",
+  oauth: { issuer: "https://database.factgrid.de" },
+} as AuthConfiguration;
 const now = 1_700_000_000_000;
 const session = {
+  oauthVersion: "2.0" as const,
+  oauthIssuer: "https://database.factgrid.de",
+  oauthClientId: "fixture-client",
   providerUserId: "17",
   username: "Editor",
   accessToken: "old-access",
@@ -89,5 +104,25 @@ describe("getUsableProviderSession", () => {
     await expect(
       getUsableProviderSession("opaque-session", configuration, now),
     ).resolves.toBeNull();
+  });
+
+  it.each([
+    ["legacy issuer", { oauthIssuer: null }],
+    ["legacy client", { oauthClientId: null }],
+    ["different issuer", { oauthIssuer: "https://other.example" }],
+    ["different client", { oauthClientId: "replacement-client" }],
+    ["different protocol", { oauthVersion: "1.0a" as const }],
+  ])("rejects a session with %s before refresh", async (_label, changes) => {
+    const store = {
+      get: vi.fn().mockReturnValue({ ...session, ...changes }),
+      updateProviderTokens: vi.fn(),
+    };
+    mocks.getSessionStore.mockReturnValue(store);
+
+    await expect(
+      getUsableProviderSession("opaque-session", configuration, now),
+    ).resolves.toBeNull();
+    expect(mocks.refreshProviderTokens).not.toHaveBeenCalled();
+    expect(store.updateProviderTokens).not.toHaveBeenCalled();
   });
 });

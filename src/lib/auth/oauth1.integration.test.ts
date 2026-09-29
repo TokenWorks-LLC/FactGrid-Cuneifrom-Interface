@@ -12,8 +12,10 @@ import { POST as logout } from "@/app/api/auth/logout/route";
 import { getAuthConfiguration } from "./config";
 import { FACTGRID_ORIGIN, OAUTH_TRANSACTION_COOKIE_NAME, SESSION_COOKIE_NAME } from "./constants";
 import { providerAuthorizationHeader } from "./oauth";
+import { initiateOAuth1 } from "./oauth1";
 import { getUsableProviderSession } from "./provider-session";
 import { getSessionStore } from "./session";
+import { oauthRateLimiter } from "./auth-rate-limit";
 
 const origin = "https://interface.example";
 const consumerKey = "fixture-consumer-key";
@@ -133,6 +135,7 @@ async function completeLogin() {
 }
 
 beforeEach(() => {
+  oauthRateLimiter.clear();
   sequence += 1;
   vi.stubEnv("APP_ORIGIN", origin);
   vi.stubEnv("FACTGRID_OAUTH_CALLBACK_URL", `${origin}/api/auth/callback`);
@@ -188,7 +191,11 @@ describe("OAuth 1.0a real route handlers", () => {
     const response = await logout(request("/api/auth/logout", cookie, {
       method: "POST", headers: { origin, "x-csrf-token": body.csrfToken },
     }));
-    expect(response.status).toBe(204);
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toEqual({
+      signedOut: true,
+      serverSessionRevoked: true,
+    });
     expect(getSessionStore(config()).get(token)).toBeNull();
   });
 
@@ -236,6 +243,83 @@ describe("OAuth 1.0a real route handlers", () => {
     expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 
+  it("rate-limits login before another provider request or transaction write", async () => {
+    const fetchMock = provider();
+    for (let index = 0; index < 10; index += 1) {
+      expect((await login(request("/api/auth/login"))).status).toBe(302);
+    }
+    const store = getSessionStore(config());
+    const before = store.database.prepare(
+      "SELECT COUNT(*) AS count FROM auth_oauth1_transactions",
+    ).get() as { count: number };
+
+    const rejected = await login(request("/api/auth/login"));
+    const after = store.database.prepare(
+      "SELECT COUNT(*) AS count FROM auth_oauth1_transactions",
+    ).get() as { count: number };
+    expect(rejected.status).toBe(429);
+    expect(rejected.headers.get("retry-after")).toMatch(/^\d+$/u);
+    expect(fetchMock).toHaveBeenCalledTimes(10);
+    expect(after.count).toBe(before.count);
+  });
+
+  it("rate-limits callbacks before consuming the pending transaction", async () => {
+    const store = getSessionStore(config());
+    const values = Array.from({ length: 21 }, () => store.createOAuth1Transaction({
+      requestToken: requestKey,
+      requestTokenSecret: requestSecret,
+      returnTo: "/",
+      clientId: consumerKey,
+      callbackUrl: `${origin}/api/auth/callback`,
+    }));
+    const path = "/api/auth/callback?oauth_token=wrong&oauth_verifier=approved-verifier";
+    for (const value of values.slice(0, 20)) {
+      const response = await callback(request(
+        path,
+        `${OAUTH_TRANSACTION_COOKIE_NAME}=${value}`,
+      ));
+      expect(response.status).toBe(400);
+    }
+
+    const rejected = await callback(request(
+      path,
+      `${OAUTH_TRANSACTION_COOKIE_NAME}=${values[20]}`,
+    ));
+    expect(rejected.status).toBe(429);
+    expect(store.consumeOAuth1Transaction(values[20])).not.toBeNull();
+  });
+
+  it("accepts identity timestamps inside the 30 second tolerance", async () => {
+    const now = Math.floor(Date.now() / 1_000);
+    provider({ invalidClaims: { iat: now + 15, exp: now - 15 } });
+    expect((await completeLogin()).response.status).toBe(303);
+  });
+
+  it("rejects identity timestamps beyond the 30 second tolerance", async () => {
+    const now = Math.floor(Date.now() / 1_000);
+    provider({ invalidClaims: { iat: now + 60, exp: now + 120 } });
+    expect((await completeLogin()).response.status).toBe(502);
+  });
+
+  it("cancels an oversized chunked OAuth 1 response", async () => {
+    const chunks = [new Uint8Array(64 * 1024), new Uint8Array([1])];
+    const cancel = vi.fn();
+    let chunkIndex = 0;
+    vi.stubGlobal("fetch", vi.fn(async () => new Response(
+      new ReadableStream<Uint8Array>({
+        pull(controller) {
+          const chunk = chunks[chunkIndex];
+          chunkIndex += 1;
+          if (chunk) controller.enqueue(chunk);
+        },
+        cancel,
+      }),
+    )));
+
+    await expect(initiateOAuth1(config())).rejects.toThrow("too large");
+    expect(cancel).toHaveBeenCalledOnce();
+  });
+
   it.each([
     { iss: "evil.example" }, { iss: "database.factgrid.de" }, { aud: "another-consumer" }, { nonce: "wrong-nonce" },
     { exp: 1 }, { iat: 1 }, { iat: 4_000_000_000 }, { username: "" }, { sub: undefined },
@@ -265,7 +349,12 @@ describe("OAuth 1.0a real route handlers", () => {
   });
 
   it("rejects protocol-mismatched sessions instead of sending OAuth 2 tokens as OAuth 1", async () => {
-    const stored = getSessionStore(config()).create({ providerUserId: "99", username: "Old user", accessToken: "old-bearer" });
+    const current = config();
+    const stored = getSessionStore(current).create({
+      oauthVersion: "2.0", oauthIssuer: current.oauth.issuer,
+      oauthClientId: current.clientId, providerUserId: "99",
+      username: "Old user", accessToken: "old-bearer",
+    });
     await expect(getUsableProviderSession(stored.token, config())).resolves.toBeNull();
     expect(await (await sessionRoute(request("/api/session", `${SESSION_COOKIE_NAME}=${stored.token}`))).json()).toEqual({ authenticated: false });
   });

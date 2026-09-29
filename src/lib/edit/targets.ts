@@ -36,3 +36,16 @@ export function isAllowedEditTarget(
 ): boolean {
   return targets.has(targetKey(reference.qid, reference.title));
 }
+
+/**
+ * Deployment policy is separate from document-format eligibility. Authenticated
+ * mode permits every server-resolved eligible target; restricted mode requires
+ * the exact configured tablet/title pair.
+ */
+export function isEditTargetEnabled(
+  reference: DocumentReference,
+  contributorPolicy: "restricted" | "authenticated",
+  targets: ReadonlySet<string>,
+): boolean {
+  return contributorPolicy === "authenticated" || isAllowedEditTarget(reference, targets);
+}

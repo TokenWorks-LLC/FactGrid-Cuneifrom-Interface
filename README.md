@@ -13,9 +13,12 @@ The MVP provides:
 - editing controls available only to eligible signed-in contributors;
 - revision-aware editing for complete Wikibase item metadata, with unsupported
   property datatypes kept visibly read-only;
+- provider-aware revision confirmation, exact duplicate prevention, and P251
+  isolation from generic metadata writes;
 - a deliberately narrow editor for one verified plain `D-Q…` transcript region;
 - creation and P251 linking of a missing canonical `D-Q{qid}` transcription page;
 - fail-closed editing when OAuth, the feature switch, or contributor policy denies it.
+- account-scoped dirty-draft recovery across reloads and application navigation.
 
 OAuth and writes are implemented and contract-tested, but are not configured
 or claimed as live-verified. They require a FactGrid-approved OAuth consumer, an
@@ -46,6 +49,13 @@ permission: editing remains separately switch- and contributor-policy-gated. The
 default `restricted` policy requires exact editor and target allowlists; explicit
 `authenticated` mode still requires current FactGrid rights, OAuth grants, and
 record linkage.
+
+After FactGrid returns a definite revision, any later readback or attribution
+failure is reported as **accepted but unconfirmed**. The draft remains available,
+the ordinary retry path is disabled, and the contributor must reconcile against
+FactGrid history before starting a refreshed edit. A lost submission response is
+instead an **unknown** outcome; creation may also report **partial success** when
+the page exists but its P251 link still needs reconciliation.
 
 ## Commands
 

@@ -25,3 +25,7 @@ export const CSRF_HEADER_NAME = "x-csrf-token";
 export const SESSION_TTL_SECONDS = 7 * 24 * 60 * 60;
 export const OAUTH_TRANSACTION_TTL_SECONDS = 10 * 60;
 export const UPSTREAM_TIMEOUT_MS = 10_000;
+export const OAUTH_IDENTITY_CLOCK_TOLERANCE_SECONDS = 30;
+export const OAUTH_RESPONSE_MAX_BYTES = 64 * 1024;
+export const OAUTH_TOKEN_MAX_BYTES = 4 * 1024;
+export const TRUSTED_PROXY_CLIENT_IP_HEADER = "x-factgrid-client-ip";

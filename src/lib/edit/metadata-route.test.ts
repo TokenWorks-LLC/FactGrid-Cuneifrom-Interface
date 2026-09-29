@@ -95,4 +95,23 @@ describe("metadata mutation route security", () => {
     expect(await response.json()).toMatchObject({ error: { code: "account_blocked" } });
     expect(mocks.saveMetadata).not.toHaveBeenCalled();
   });
+
+  it.each([409, 502])("labels post-acceptance metadata failures as accepted-unconfirmed (%s)", async (status) => {
+    authenticate();
+    mocks.saveMetadata.mockRejectedValueOnce(
+      new TranscriptEditError(
+        "save_confirmation_failed",
+        "FactGrid accepted the edit, but confirmation failed.",
+        { status },
+      ),
+    );
+
+    const response = await PUT(request(), context);
+
+    expect(response.status).toBe(status);
+    expect(await response.json()).toMatchObject({
+      error: { code: "save_confirmation_failed" },
+      saveStatus: "accepted_unconfirmed",
+    });
+  });
 });

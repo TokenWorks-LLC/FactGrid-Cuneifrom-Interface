@@ -21,6 +21,7 @@ export interface AuthConfiguration {
   secureCookies: boolean;
   editingEnabled: boolean;
   contributorPolicy: "restricted" | "authenticated";
+  trustProxy: boolean;
   allowedEditors: ReadonlySet<string>;
   oauth: {
     issuer: string;
@@ -88,6 +89,10 @@ export function getAuthConfiguration(
   if (contributorPolicy !== "restricted" && contributorPolicy !== "authenticated") {
     invalid.push("FACTGRID_CONTRIBUTOR_POLICY");
   }
+  const trustProxyValue = env.FACTGRID_TRUST_PROXY?.trim() || "false";
+  if (trustProxyValue !== "true" && trustProxyValue !== "false") {
+    invalid.push("FACTGRID_TRUST_PROXY");
+  }
 
   if (missing.length > 0) {
     return { available: false, missing: [...missing], invalid };
@@ -142,6 +147,7 @@ export function getAuthConfiguration(
       secureCookies: production,
       editingEnabled: env.FACTGRID_EDITING_ENABLED === "true",
       contributorPolicy: contributorPolicy as "restricted" | "authenticated",
+      trustProxy: trustProxyValue === "true",
       allowedEditors: parseAllowedEditors(env.FACTGRID_ALLOWED_EDITORS),
       oauth: {
         issuer: FACTGRID_OAUTH_ISSUER,

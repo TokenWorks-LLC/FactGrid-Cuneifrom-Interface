@@ -6,6 +6,9 @@ import type { StoredSession } from "@/lib/auth/session-store";
 import { verifyFreshEditorProfile } from "./authorization";
 
 const session: StoredSession = {
+  oauthVersion: "2.0",
+  oauthIssuer: "https://database.factgrid.de",
+  oauthClientId: "fixture-client",
   providerUserId: "17",
   username: "Editor",
   accessToken: "secret",

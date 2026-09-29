@@ -16,6 +16,7 @@ import {
   SESSION_COOKIE_NAME,
 } from "./constants";
 import { getUsableProviderSession } from "./provider-session";
+import { oauthRateLimiter } from "./auth-rate-limit";
 import { getSessionStore } from "./session";
 import { openOAuthTransaction, sealOAuthTransaction } from "./transaction";
 
@@ -51,6 +52,7 @@ function setConfiguredEnvironment(options?: {
     `fixture-session-secret-${configurationSequence.toString().padStart(12, "0")}`,
   );
   vi.stubEnv("NODE_ENV", "production");
+  vi.stubEnv("FACTGRID_TRUST_PROXY", "true");
   vi.stubEnv(
     "FACTGRID_EDITING_ENABLED",
     options?.editingEnabled ? "true" : "false",
@@ -191,6 +193,7 @@ function expectPrivateNoStore(response: Response): void {
 }
 
 beforeEach(() => {
+  oauthRateLimiter.clear();
   setConfiguredEnvironment();
 });
 
@@ -292,6 +295,20 @@ describe("authentication route integration", () => {
     expect(consoleWarn).not.toHaveBeenCalled();
   });
 
+  it("requires a fresh login after the configured client registration changes", async () => {
+    const { sessionToken } = await completeLogin();
+    const cookie = cookieHeader(SESSION_COOKIE_NAME, sessionToken);
+    expect(await (await session(request("/api/session", {
+      headers: { cookie },
+    }))).json()).toMatchObject({ authenticated: true });
+
+    vi.stubEnv("FACTGRID_OAUTH_CLIENT_ID", "replacement-client-id");
+    vi.stubEnv("FACTGRID_OAUTH_CLIENT_SECRET", "replacement-client-secret");
+    expect(await (await session(request("/api/session", {
+      headers: { cookie },
+    }))).json()).toEqual({ authenticated: false });
+  });
+
   it("accepts an exact configured callback reconstructed by a trusted TLS proxy", async () => {
     const started = await beginLogin("/browse");
     installProviderFixture({
@@ -315,6 +332,28 @@ describe("authentication route integration", () => {
     expect(response.status).toBe(303);
     expect(response.headers.get("location")).toBe(`${APP_ORIGIN}/browse`);
     expect(response.cookies.get(SESSION_COOKIE_NAME)?.value).toBeTruthy();
+  });
+
+  it("does not trust forwarded callback identity without the explicit proxy boundary", async () => {
+    const started = await beginLogin("/browse");
+    const fixture = installProviderFixture();
+    vi.stubEnv("FACTGRID_TRUST_PROXY", "false");
+    const response = await callback(
+      new NextRequest(
+        `http://interface.example/api/auth/callback?code=fixture-code&state=${started.transaction.state}`,
+        {
+          headers: {
+            cookie: cookieHeader(OAUTH_TRANSACTION_COOKIE_NAME, started.sealed),
+            "x-forwarded-host": "interface.example",
+            "x-forwarded-proto": "https",
+          },
+        },
+      ),
+    );
+
+    expect(response.status).toBe(400);
+    expect(await response.json()).toMatchObject({ error: { code: "invalid_callback" } });
+    expect(fixture.fetchMock).not.toHaveBeenCalled();
   });
 
   it.each([
@@ -564,7 +603,11 @@ describe("authentication route integration", () => {
       }),
     );
 
-    expect(response.status).toBe(204);
+    expect(response.status).toBe(200);
+    await expect(response.clone().json()).resolves.toEqual({
+      signedOut: true,
+      serverSessionRevoked: true,
+    });
     expect(response.cookies.get(SESSION_COOKIE_NAME)?.value).toBe("");
     expect(response.headers.get("set-cookie")).toMatch(/Max-Age=0/i);
     expectPrivateNoStore(response);
@@ -641,6 +684,9 @@ describe("provider refresh with real isolated session storage", () => {
     const store = getSessionStore(config);
     const created = store.create(
       {
+        oauthVersion: "2.0",
+        oauthIssuer: config.oauth.issuer,
+        oauthClientId: config.clientId,
         providerUserId: "42",
         username: "Scholar",
         accessToken: "expired-provider-access",
@@ -663,6 +709,9 @@ describe("provider refresh with real isolated session storage", () => {
 
     const second = store.create(
       {
+        oauthVersion: "2.0",
+        oauthIssuer: config.oauth.issuer,
+        oauthClientId: config.clientId,
         providerUserId: "43",
         username: "AnotherScholar",
         accessToken: "expired-second-access",

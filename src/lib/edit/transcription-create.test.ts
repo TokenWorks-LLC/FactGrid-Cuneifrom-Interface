@@ -77,7 +77,16 @@ function confirmedPage(
 }
 
 function confirmedLink(): TranscriptionCreationInspection {
-  return confirmedPage({ entityRevisionId: 51, p251Values: [canonicalUrl] });
+  return confirmedPage({
+    entityRevisionId: 51,
+    entityRevision: {
+      revisionId: 51,
+      username: identity.username,
+      userId: identity.providerUserId,
+      comment: "/* wbeditentity-update:0| */ Item changed, Link transliteration document via FactGrid Cuneiform Interface",
+    },
+    p251Values: [canonicalUrl],
+  });
 }
 
 function providerWithInspections(
@@ -254,6 +263,21 @@ describe("transcription creation orchestration", () => {
     expect(provider.linkPage).toHaveBeenCalledOnce();
   });
 
+  it("does not adopt an orphan page with the wrong content model or format", async () => {
+    for (const page of [
+      { contentModel: "json", contentFormat: "application/json" },
+      { contentModel: "wikitext", contentFormat: "text/plain" },
+    ]) {
+      const provider = providerWithInspections(confirmedPage({
+        page: { ...confirmedPage().page, ...page },
+      }));
+      await expect(createTranscription(creationInput(), { provider })).rejects.toMatchObject({
+        code: "page_exists_unlinked",
+      });
+      expect(provider.linkPage).not.toHaveBeenCalled();
+    }
+  });
+
   it("does not blindly retry an uncertain page creation", async () => {
     const provider = providerWithInspections(inspection());
     provider.createPage.mockRejectedValue(
@@ -272,6 +296,18 @@ describe("transcription creation orchestration", () => {
     });
     expect(provider.createPage).toHaveBeenCalledOnce();
     expect(provider.inspect).toHaveBeenCalledOnce();
+    expect(provider.linkPage).not.toHaveBeenCalled();
+  });
+
+  it("does not confirm a newly created page with the wrong content model", async () => {
+    const wrongModel = confirmedPage();
+    wrongModel.page = { ...wrongModel.page, contentModel: "json", contentFormat: "application/json" };
+    const provider = providerWithInspections(inspection(), wrongModel);
+
+    await expect(createTranscription(creationInput(), { provider })).rejects.toMatchObject({
+      code: "creation_confirmation_failed",
+      recovery: { pageRevisionId: 101, nextAction: "check_page" },
+    });
     expect(provider.linkPage).not.toHaveBeenCalled();
   });
 
@@ -310,6 +346,53 @@ describe("transcription creation orchestration", () => {
 
     expect(result.status).toBe("created_and_linked");
     expect(provider.linkPage).toHaveBeenCalledOnce();
+  });
+
+  it("reports another contributor's identical reconciled link as already available", async () => {
+    const linkedByOther = confirmedLink();
+    linkedByOther.entityRevision = {
+      ...linkedByOther.entityRevision,
+      username: "Other editor",
+      userId: "18",
+    };
+    const provider = providerWithInspections(inspection(), confirmedPage(), linkedByOther);
+    provider.linkPage.mockRejectedValue(
+      new TranscriptionCreationError("link_status_unknown", "connection ended", { status: 502 }),
+    );
+
+    await expect(createTranscription(creationInput(), { provider })).resolves.toMatchObject({
+      status: "already_available",
+      entityRevisionId: 51,
+    });
+    expect(provider.linkPage).toHaveBeenCalledOnce();
+  });
+
+  it("reconciles a link conflict once when the canonical link is now present", async () => {
+    const provider = providerWithInspections(inspection(), confirmedPage(), confirmedLink());
+    provider.linkPage.mockRejectedValue(
+      new TranscriptionCreationError("provider_rejected_link", "edit conflict", { status: 409 }),
+    );
+
+    await expect(createTranscription(creationInput(), { provider })).resolves.toMatchObject({
+      status: "created_and_linked",
+      entityRevisionId: 51,
+    });
+    expect(provider.linkPage).toHaveBeenCalledOnce();
+  });
+
+  it("requires exact entity revision attribution after a definite link response", async () => {
+    const wrongAttribution = confirmedLink();
+    wrongAttribution.entityRevision = {
+      ...wrongAttribution.entityRevision,
+      username: "Other editor",
+      userId: "18",
+    };
+    const provider = providerWithInspections(inspection(), confirmedPage(), wrongAttribution);
+
+    await expect(createTranscription(creationInput(), { provider })).rejects.toMatchObject({
+      code: "link_confirmation_failed",
+      recovery: { nextAction: "check_link" },
+    });
   });
 
   it("retains check-link recovery when an uncertain link cannot be confirmed", async () => {
@@ -477,7 +560,18 @@ describe("FactGrid transcription creation provider", () => {
           },
           tokens: { csrftoken: "csrf-token-value" },
           pages: [
-            { pageid: 42, ns: 120, title: "Item:Q42", actions: { edit: true } },
+            {
+              pageid: 42,
+              ns: 120,
+              title: "Item:Q42",
+              actions: { edit: true },
+              revisions: [{
+                revid: 50,
+                user: "Editor",
+                userid: 17,
+                comment: "/* wbeditentity-update:0| */ Item changed",
+              }],
+            },
             { ns: 0, title: "D-Q42", missing: true, actions: { edit: true } },
           ],
         },
@@ -490,6 +584,12 @@ describe("FactGrid transcription creation provider", () => {
     expect(result).toMatchObject({
       qid: "Q42",
       entityRevisionId: 50,
+      entityRevision: {
+        revisionId: 50,
+        username: "Editor",
+        userId: "17",
+        comment: "/* wbeditentity-update:0| */ Item changed",
+      },
       isCatalogueMember: true,
       p251Values: [canonicalUrl],
       p69Values: ["https://example.test/edition"],

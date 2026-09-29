@@ -17,7 +17,7 @@ export default async function TabletEditorPage({ params }: { params: Promise<{ q
   const { qid } = await params;
   let tablet;
   try {
-    tablet = await getTablet(qid);
+    tablet = await getTablet(qid, { includeDocuments: false });
   } catch (error) {
     if (error instanceof FactGridNotFoundError) notFound();
     throw error;

@@ -109,7 +109,7 @@ test("authenticated account and logout controls render through an isolated brows
     expect(route.request().headers()["x-csrf-token"]).toBe("fixture-csrf-token");
     loggedOut = true;
     await logoutPending;
-    await route.fulfill({ contentType: "application/json", body: JSON.stringify({ ok: true }) });
+    await route.fulfill({ contentType: "application/json", body: JSON.stringify({ signedOut: true, serverSessionRevoked: true }) });
   });
   await page.goto("/about");
 
@@ -165,7 +165,7 @@ test("plain Transcript-section poems remain readable", async ({ page }) => {
   await page.goto("/tablets/Q9000002");
 
   await expect(page.getByText("a-na EN", { exact: false }).first()).toBeVisible();
-  await expect(page.getByText(/not on this deployment.*approved edit-target list/)).toBeVisible();
+  await expect(page.getByText(/Editing is not configured for this deployment/)).toBeVisible();
   expect(
     await page.locator("html").evaluate((element) => element.scrollWidth <= element.clientWidth),
   ).toBe(true);

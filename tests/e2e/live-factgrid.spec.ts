@@ -23,7 +23,7 @@ test("live plain Transcript-section poems remain readable", async ({ page }) => 
   await page.goto("/tablets/Q1089841");
 
   await expect(page.getByText("ap-pa-tu", { exact: false }).first()).toBeVisible();
-  await expect(page.getByText(/not on this deployment.*approved edit-target list/)).toBeVisible();
+  await expect(page.getByText(/Editing is not configured for this deployment/)).toBeVisible();
   expect(
     await page.locator("html").evaluate((element) => element.scrollWidth <= element.clientWidth),
   ).toBe(true);

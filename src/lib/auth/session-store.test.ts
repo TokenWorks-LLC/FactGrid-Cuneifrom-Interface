@@ -10,6 +10,11 @@ import { hashOpaqueToken, sealString } from "./crypto";
 
 const stores: SessionStore[] = [];
 const temporaryDirectories: string[] = [];
+const binding = {
+  oauthVersion: "2.0" as const,
+  oauthIssuer: "https://database.factgrid.de",
+  oauthClientId: "fixture-client",
+};
 
 function store(): SessionStore {
   const value = new SessionStore(new Database(":memory:"), "s".repeat(32));
@@ -25,7 +30,7 @@ afterEach(() => {
 });
 
 describe("SessionStore", () => {
-  it("upgrades an existing OAuth 2 database without losing its sessions", () => {
+  it("keeps legacy rows unbound while new sessions record their registration", () => {
     const database = new Database(":memory:");
     database.exec(`CREATE TABLE auth_sessions (
       id_hash TEXT PRIMARY KEY, provider_user_id TEXT NOT NULL,
@@ -45,19 +50,24 @@ describe("SessionStore", () => {
     const upgraded = new SessionStore(database, secret);
     stores.push(upgraded);
     expect(upgraded.get(token, now)).toMatchObject({
-      oauthVersion: "2.0", username: "Existing scholar", accessToken: "legacy-access", accessTokenSecret: null,
+      oauthVersion: "2.0", oauthIssuer: null, oauthClientId: null,
+      username: "Existing scholar", accessToken: "legacy-access", accessTokenSecret: null,
     });
     const newLogin = upgraded.create({
-      oauthVersion: "1.0a", providerUserId: "43", username: "New scholar",
+      ...binding, oauthVersion: "1.0a", providerUserId: "43", username: "New scholar",
       accessToken: "new-access", accessTokenSecret: "new-access-secret",
     }, now);
-    expect(upgraded.get(newLogin.token, now)).toMatchObject({ oauthVersion: "1.0a", accessTokenSecret: "new-access-secret" });
+    expect(upgraded.get(newLogin.token, now)).toMatchObject({
+      oauthVersion: "1.0a", oauthIssuer: binding.oauthIssuer,
+      oauthClientId: binding.oauthClientId, accessTokenSecret: "new-access-secret",
+    });
     expect(upgraded.get(token, now)?.username).toBe("Existing scholar");
   });
   it("stores only a hashed session ID and encrypted provider tokens", () => {
     const sessions = store();
     const created = sessions.create(
       {
+        ...binding,
         providerUserId: "42",
         username: "Scholar",
         accessToken: "plain-access-token",
@@ -85,11 +95,13 @@ describe("SessionStore", () => {
     const sessions = store();
     const now = 1_700_000_000_000;
     const first = sessions.create({
+      ...binding,
       providerUserId: "1",
       username: "One",
       accessToken: "access-one",
     }, now);
     const second = sessions.create({
+      ...binding,
       providerUserId: "2",
       username: "Two",
       accessToken: "access-two",
@@ -100,6 +112,7 @@ describe("SessionStore", () => {
     expect(sessions.get(second.token, now + SESSION_TTL_SECONDS * 1000 + 1)).toBeNull();
 
     const third = sessions.create({
+      ...binding,
       providerUserId: "3",
       username: "Three",
       accessToken: "access-three",
@@ -112,6 +125,7 @@ describe("SessionStore", () => {
     const sessions = store();
     const now = 1_700_000_000_000;
     const created = sessions.create({
+      ...binding,
       providerUserId: "42",
       username: "Scholar",
       accessToken: "old-access",
@@ -135,11 +149,13 @@ describe("SessionStore", () => {
   it("revokes a prior session when the same FactGrid identity signs in again", () => {
     const sessions = store();
     const first = sessions.create({
+      ...binding,
       providerUserId: "42",
       username: "Scholar",
       accessToken: "first-access",
     });
     const second = sessions.create({
+      ...binding,
       providerUserId: "42",
       username: "Scholar",
       accessToken: "second-access",
@@ -159,5 +175,28 @@ describe("SessionStore", () => {
     if (process.platform !== "win32") {
       expect(statSync(path).mode & 0o777).toBe(0o600);
     }
+  });
+
+  it("preserves the exact registration binding when the database is reopened", () => {
+    const directory = mkdtempSync(join(tmpdir(), "factgrid-session-binding-test-"));
+    temporaryDirectories.push(directory);
+    const path = join(directory, "sessions.sqlite");
+    const secret = "s".repeat(32);
+    const first = SessionStore.open(path, secret);
+    const created = first.create({
+      ...binding,
+      providerUserId: "42",
+      username: "Scholar",
+      accessToken: "provider-access",
+    });
+    first.close();
+
+    const reopened = SessionStore.open(path, secret);
+    stores.push(reopened);
+    expect(reopened.get(created.token)).toMatchObject({
+      oauthVersion: binding.oauthVersion,
+      oauthIssuer: binding.oauthIssuer,
+      oauthClientId: binding.oauthClientId,
+    });
   });
 });

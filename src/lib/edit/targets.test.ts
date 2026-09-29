@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { isAllowedEditTarget, parseAllowedEditTargets } from "./targets";
+import { isAllowedEditTarget, isEditTargetEnabled, parseAllowedEditTargets } from "./targets";
 
 const reference = {
   kind: "unicode" as const,
@@ -24,5 +24,23 @@ describe("edit target allowlist", () => {
     expect(
       isAllowedEditTarget(reference, parseAllowedEditTargets("q42|UNICODE-W-Q42")),
     ).toBe(false);
+  });
+});
+
+describe("edit target contributor policy", () => {
+  const reference = {
+    kind: "d" as const,
+    qid: "Q42" as const,
+    title: "D-Q42",
+    url: "https://database.factgrid.de/wiki/D-Q42",
+  };
+
+  it("allows a server-resolved target without a deployment list in authenticated mode", () => {
+    expect(isEditTargetEnabled(reference, "authenticated", new Set())).toBe(true);
+  });
+
+  it("keeps exact target enforcement in restricted mode", () => {
+    expect(isEditTargetEnabled(reference, "restricted", new Set())).toBe(false);
+    expect(isEditTargetEnabled(reference, "restricted", parseAllowedEditTargets("Q42|D-Q42"))).toBe(true);
   });
 });

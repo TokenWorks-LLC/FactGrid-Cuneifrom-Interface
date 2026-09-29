@@ -3,7 +3,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getAuthConfiguration } from "@/lib/auth/config";
 import { CSRF_HEADER_NAME } from "@/lib/auth/constants";
 import { hasValidCsrfToken, isSameOriginRequest } from "@/lib/auth/policy";
-import { authUnavailable, noStore, privateJson } from "@/lib/auth/responses";
+import { privateJson } from "@/lib/auth/responses";
 import {
   clearSessionCookie,
   getSessionStore,
@@ -18,6 +18,10 @@ function sessionRevocationUnavailable(
 ): NextResponse {
   const response = privateJson(
     {
+      signedOut: true,
+      serverSessionRevoked: false,
+      warning:
+        "The browser credential was cleared, but the server session could not be revoked. Revoke the connected application in FactGrid if needed.",
       error: {
         code: "session_unavailable",
         message:
@@ -33,7 +37,19 @@ function sessionRevocationUnavailable(
 export async function POST(request: NextRequest): Promise<NextResponse> {
   const result = getAuthConfiguration();
   if (!result.available) {
-    const response = authUnavailable();
+    const response = privateJson(
+      {
+        signedOut: true,
+        serverSessionRevoked: false,
+        warning:
+          "The browser credential was cleared, but the server session could not be revoked because sign-in is not configured.",
+        error: {
+          code: "auth_unavailable",
+          message: "FactGrid sign-in is not configured for this deployment.",
+        },
+      },
+      { status: 503 },
+    );
     // OAuth configuration can disappear while a browser still holds a local
     // credential. Revocation cannot be confirmed without the configured store,
     // but the browser must not retain a session that could silently revive.
@@ -44,6 +60,8 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   if (!isSameOriginRequest(request, result.config.appOrigin)) {
     return privateJson(
       {
+        signedOut: false,
+        serverSessionRevoked: false,
         error: {
           code: "invalid_origin",
           message: "The logout request did not come from this application.",
@@ -65,6 +83,8 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   if (session && !hasValidCsrfToken(request, session.csrfToken, CSRF_HEADER_NAME)) {
     return privateJson(
       {
+        signedOut: false,
+        serverSessionRevoked: false,
         error: {
           code: "invalid_csrf_token",
           message: "The logout request could not be verified.",
@@ -79,7 +99,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   } catch {
     return sessionRevocationUnavailable(result.config);
   }
-  const response = new NextResponse(null, { status: 204 });
+  const response = privateJson({ signedOut: true, serverSessionRevoked: true });
   clearSessionCookie(response, result.config);
-  return noStore(response);
+  return response;
 }

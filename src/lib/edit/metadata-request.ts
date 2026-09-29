@@ -7,7 +7,6 @@ export const MAX_METADATA_BODY_BYTES = 1_000_000;
 const CONTROL_CHARACTERS = /[\u0000-\u001f\u007f]/u;
 const PROPERTY_ID = /^P[1-9][0-9]{0,14}$/u;
 const ENTITY_ID = /^(?:Q|P|L)[1-9][0-9]{0,14}(?:-(?:F|S)[1-9][0-9]{0,14})?$/u;
-const STATEMENT_ID = /^Q[1-9][0-9]{0,14}\$[A-Za-z0-9-]{1,96}$/u;
 const HASH = /^[a-f0-9]{40}$/u;
 const LANGUAGE = /^[A-Za-z][A-Za-z0-9-]{0,34}$/u;
 const SITE = /^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$/u;
@@ -20,7 +19,13 @@ const boundedText = (maximum: number) =>
   });
 
 export const propertyIdSchema = z.string().regex(PROPERTY_ID);
-export const statementIdSchema = z.string().regex(STATEMENT_ID);
+// Statement GUIDs are provider-owned opaque identifiers. Wikibase has emitted
+// historical forms (including lower-case entity prefixes) that must be
+// preserved exactly; ownership is checked against the freshly loaded entity.
+export const statementIdSchema = z.string().min(3).max(200).refine(
+  (value) => !CONTROL_CHARACTERS.test(value),
+  { message: "Statement identifiers cannot contain control characters." },
+);
 const languageSchema = z.string().regex(LANGUAGE);
 
 const stringValueSchema = z

@@ -72,10 +72,15 @@ export function parsePositiveInteger(value: unknown, field: string): number {
 }
 
 export function parseEditionId(value: unknown, qid: Qid): string {
+  const separator = typeof value === "string" ? value.indexOf("$") : -1;
   if (
     typeof value !== "string" ||
-    value.length > 120 ||
-    !new RegExp(`^${qid}\\$[A-Za-z0-9-]+$`).test(value)
+    value.length < 3 ||
+    value.length > 200 ||
+    CONTROL_CHARACTERS.test(value) ||
+    separator <= 0 ||
+    separator >= value.length - 1 ||
+    value.slice(0, separator).toUpperCase() !== qid
   ) {
     throw new FactGridInputError("Edition ID is not a valid P251 statement identifier.");
   }

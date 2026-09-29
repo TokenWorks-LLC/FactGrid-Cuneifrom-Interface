@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 
 import { getAuthConfiguration } from "@/lib/auth/config";
+import { checkOAuthRateLimit } from "@/lib/auth/auth-rate-limit";
 import { OAUTH_TRANSACTION_COOKIE_NAME } from "@/lib/auth/constants";
 import {
   exchangeAuthorizationCode,
@@ -66,19 +67,25 @@ function forwardedOrigin(request: NextRequest): string | null {
   }
 }
 
-function isExpectedCallback(request: NextRequest, configuredCallback: URL): boolean {
+function isExpectedCallback(
+  request: NextRequest,
+  configuredCallback: URL,
+  trustProxy: boolean,
+): boolean {
   const requestUrl = new URL(request.url);
   if (requestUrl.pathname !== configuredCallback.pathname) return false;
   if (requestUrl.origin === configuredCallback.origin) return true;
-  return forwardedOrigin(request) === configuredCallback.origin;
+  return trustProxy && forwardedOrigin(request) === configuredCallback.origin;
 }
 
 export async function GET(request: NextRequest): Promise<NextResponse> {
   const result = getAuthConfiguration();
   if (!result.available) return authUnavailable();
+  const rateLimited = checkOAuthRateLimit(request, result.config, "callback");
+  if (rateLimited) return rateLimited;
 
   const configuredCallback = new URL(result.config.callbackUrl);
-  if (!isExpectedCallback(request, configuredCallback)) {
+  if (!isExpectedCallback(request, configuredCallback, result.config.trustProxy)) {
     return errorResponse(
       400,
       "invalid_callback",
@@ -120,6 +127,8 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     try {
       const session = getSessionStore(result.config).create({
         oauthVersion: "1.0a",
+        oauthIssuer: result.config.oauth.issuer,
+        oauthClientId: result.config.clientId,
         providerUserId: profile.providerUserId,
         username: profile.username,
         ...tokens,
@@ -183,6 +192,9 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
 
   try {
     const session = getSessionStore(result.config).create({
+      oauthVersion: "2.0",
+      oauthIssuer: result.config.oauth.issuer,
+      oauthClientId: result.config.clientId,
       providerUserId: profile.providerUserId,
       username: profile.username,
       accessToken: tokens.accessToken,

@@ -9,7 +9,7 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 
 type AccessState =
   | { status: "checking" }
-  | { status: "ready"; csrfToken: string; model: MetadataModel }
+  | { status: "ready"; csrfToken: string; ownerId: string; model: MetadataModel }
   | { status: "blocked"; title: string; message: string; href?: string; linkText?: string };
 
 export function TabletEditor({
@@ -39,6 +39,7 @@ export function TabletEditor({
         csrfToken?: string;
         editingEnabled?: boolean;
         editorApproved?: boolean;
+        user?: { id?: string };
       };
       if (!session.authenticated) return {
         status: "blocked",
@@ -52,7 +53,7 @@ export function TabletEditor({
         title: "Editing disabled",
         message: "You are signed in, but editing is currently disabled for this deployment.",
       };
-      if (session.editorApproved !== true || !session.csrfToken) return {
+      if (session.editorApproved !== true || !session.csrfToken || !session.user?.id) return {
         status: "blocked",
         title: "Editing not permitted",
         message: "Your account is signed in but is not eligible to edit through this deployment.",
@@ -62,7 +63,7 @@ export function TabletEditor({
       if (!modelResponse.ok) throw new Error("Metadata unavailable");
       const model = await modelResponse.json() as MetadataModel;
       if (!model.entity || !model.properties) throw new Error("Incomplete metadata");
-      return { status: "ready", csrfToken: session.csrfToken, model };
+      return { status: "ready", csrfToken: session.csrfToken, ownerId: session.user.id, model };
     }
 
     loadEditor()
@@ -100,8 +101,8 @@ export function TabletEditor({
         <AlertTitle><h2>Editing FactGrid</h2></AlertTitle>
         <AlertDescription>Confirmed saves are attributed to your signed-in FactGrid account.</AlertDescription>
       </Alert>
-      <MetadataEditor csrfToken={access.csrfToken} initialModel={access.model} qid={qid} />
-      {offerTranscriptionCreation ? <TranscriptionCreationEditor csrfToken={access.csrfToken} qid={qid} /> : (
+      <MetadataEditor csrfToken={access.csrfToken} initialModel={access.model} ownerId={access.ownerId} qid={qid} />
+      {offerTranscriptionCreation ? <TranscriptionCreationEditor csrfToken={access.csrfToken} ownerId={access.ownerId} qid={qid} /> : (
         <p className="max-w-[70ch] text-sm leading-6 text-muted-foreground">
           To edit an existing transcription, open its edition on the{" "}
           <a className="font-medium text-foreground underline underline-offset-4" href={`/tablets/${qid}#edition-1`}>tablet record</a>.

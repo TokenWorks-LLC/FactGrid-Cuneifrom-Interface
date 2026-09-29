@@ -6,7 +6,9 @@ vi.mock("server-only", () => ({}));
 import { getAuthConfiguration } from "./config";
 import {
   buildAuthorizationUrl,
+  exchangeAuthorizationCode,
   fetchFactGridProfile,
+  refreshProviderTokens,
   validateAuthorizationCallback,
 } from "./oauth";
 
@@ -95,5 +97,77 @@ describe("FactGrid profile", () => {
     await expect(fetchFactGridProfile("provider-token", configuration())).resolves.toMatchObject({
       blocked: true,
     });
+  });
+
+  it("cancels a chunked multibyte profile response over the byte cap", async () => {
+    const chunks = [
+      new TextEncoder().encode("é".repeat(32_768)),
+      new TextEncoder().encode("é"),
+    ];
+    const cancel = vi.fn();
+    let chunkIndex = 0;
+    vi.stubGlobal("fetch", vi.fn(async () => new Response(
+      new ReadableStream<Uint8Array>({
+        pull(controller) {
+          const chunk = chunks[chunkIndex];
+          chunkIndex += 1;
+          if (chunk) controller.enqueue(chunk);
+        },
+        cancel,
+      }),
+    )));
+
+    await expect(fetchFactGridProfile("provider-token", configuration())).rejects.toThrow(
+      "too large",
+    );
+    expect(cancel).toHaveBeenCalledOnce();
+  });
+});
+
+describe("OAuth token responses", () => {
+  it("rejects and cancels an oversized streamed authorization-code response", async () => {
+    const chunks = [
+      new Uint8Array(64 * 1024),
+      new Uint8Array([1]),
+    ];
+    const cancel = vi.fn();
+    let chunkIndex = 0;
+    vi.stubGlobal("fetch", vi.fn(async () => new Response(
+      new ReadableStream<Uint8Array>({
+        pull(controller) {
+          const chunk = chunks[chunkIndex];
+          chunkIndex += 1;
+          if (chunk) controller.enqueue(chunk);
+        },
+        cancel,
+      }),
+      { headers: { "content-type": "application/json" } },
+    )));
+
+    const state = oauth.generateRandomState();
+    const parameters = validateAuthorizationCallback(
+      new URL(`https://interface.example/api/auth/callback?code=fixture-code&state=${state}`),
+      state,
+      configuration(),
+    );
+    await expect(exchangeAuthorizationCode(
+      parameters,
+      oauth.generateRandomCodeVerifier(),
+      configuration(),
+    )).rejects.toThrow("too large");
+    expect(cancel).toHaveBeenCalledOnce();
+  });
+
+  it.each(["access", "refresh"])("caps an overlong %s token field", async (field) => {
+    vi.stubGlobal("fetch", vi.fn(async () => Response.json({
+      access_token: field === "access" ? "a".repeat(4_097) : "access-token",
+      refresh_token: field === "refresh" ? "r".repeat(4_097) : "refresh-token",
+      token_type: "Bearer",
+      expires_in: 3_600,
+    })));
+
+    await expect(refreshProviderTokens("current-refresh", configuration())).rejects.toThrow(
+      "invalid OAuth token",
+    );
   });
 });

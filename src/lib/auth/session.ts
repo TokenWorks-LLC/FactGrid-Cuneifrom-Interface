@@ -44,8 +44,18 @@ export function readSession(
   const summary = getSessionStore(configuration).getSummary(
     request.cookies.get(SESSION_COOKIE_NAME)?.value,
   );
-  return summary && (summary.oauthVersion ?? "2.0") === (configuration.oauthVersion ?? "2.0")
-    ? summary : null;
+  return summary && sessionMatchesConfiguration(summary, configuration) ? summary : null;
+}
+
+export function sessionMatchesConfiguration(
+  session: Pick<SessionSummary, "oauthVersion" | "oauthIssuer" | "oauthClientId">,
+  configuration: AuthConfiguration,
+): boolean {
+  return (
+    session.oauthVersion === (configuration.oauthVersion ?? "2.0") &&
+    session.oauthIssuer === configuration.oauth.issuer &&
+    session.oauthClientId === configuration.clientId
+  );
 }
 
 export function readSessionToken(request: NextRequest): string | null {

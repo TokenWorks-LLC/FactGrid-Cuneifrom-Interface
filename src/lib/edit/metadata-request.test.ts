@@ -82,4 +82,21 @@ describe("metadata write request", () => {
       }],
     }))).rejects.toMatchObject({ code: "invalid_request" });
   });
+
+  it("bounds Unicode edit summaries by both characters and encoded bytes", async () => {
+    const body = (summary: string) => ({
+      baseRevision: 100,
+      summary,
+      confirmRemovals: false,
+      confirmCatalogueRemoval: false,
+      operations: [{ type: "set-label", language: "en", value: "Tablet" }],
+    });
+
+    await expect(parseMetadataWriteRequest(request(body("𒀭".repeat(125))))).resolves.toMatchObject({
+      summary: "𒀭".repeat(125),
+    });
+    await expect(parseMetadataWriteRequest(request(body("𒀭".repeat(126))))).rejects.toMatchObject({
+      code: "invalid_request",
+    });
+  });
 });

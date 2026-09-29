@@ -1,7 +1,12 @@
 import * as oauth from "oauth4webapi";
 
+import { bufferBoundedResponse, readBoundedResponseText } from "./bounded-response";
 import type { AuthConfiguration } from "./config";
-import { UPSTREAM_TIMEOUT_MS } from "./constants";
+import {
+  OAUTH_RESPONSE_MAX_BYTES,
+  OAUTH_TOKEN_MAX_BYTES,
+  UPSTREAM_TIMEOUT_MS,
+} from "./constants";
 import { identifyOAuth1, signOAuth1Request } from "./oauth1";
 
 export interface FactGridProfile {
@@ -65,8 +70,14 @@ const timeoutFetch: typeof fetch = (input, init) =>
     signal: AbortSignal.timeout(UPSTREAM_TIMEOUT_MS),
   });
 
+const boundedTokenFetch: typeof fetch = async (input, init) =>
+  bufferBoundedResponse(
+    await timeoutFetch(input, init),
+    OAUTH_RESPONSE_MAX_BYTES,
+  );
+
 function oauthRequestOptions(): oauth.HttpRequestOptions<"POST", URLSearchParams> {
-  return { [oauth.customFetch]: timeoutFetch };
+  return { [oauth.customFetch]: boundedTokenFetch };
 }
 
 function tokenExpiry(expiresIn: number | undefined, now: number): number | null {
@@ -82,6 +93,15 @@ function providerTokens(
 ): ProviderTokens {
   if (response.token_type !== "bearer") {
     throw new Error("Unsupported provider token type");
+  }
+  if (
+    !response.access_token ||
+    Buffer.byteLength(response.access_token, "utf8") > OAUTH_TOKEN_MAX_BYTES ||
+    (response.refresh_token !== undefined &&
+      (!response.refresh_token ||
+        Buffer.byteLength(response.refresh_token, "utf8") > OAUTH_TOKEN_MAX_BYTES))
+  ) {
+    throw new Error("FactGrid returned an invalid OAuth token");
   }
   return {
     accessToken: response.access_token,
@@ -168,12 +188,7 @@ export async function fetchFactGridProfile(
   });
   if (!response.ok) throw new Error("FactGrid profile request failed");
 
-  const contentLength = Number(response.headers.get("content-length"));
-  if (Number.isFinite(contentLength) && contentLength > 64 * 1024) {
-    throw new Error("FactGrid profile response is too large");
-  }
-  const body = await response.text();
-  if (body.length > 64 * 1024) throw new Error("FactGrid profile response is too large");
+  const body = await readBoundedResponseText(response, OAUTH_RESPONSE_MAX_BYTES);
 
   let parsed: unknown;
   try {

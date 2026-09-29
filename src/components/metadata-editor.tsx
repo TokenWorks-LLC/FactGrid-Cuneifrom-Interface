@@ -1,12 +1,15 @@
 "use client";
 
-import { useEffect, useId, useMemo, useRef, useState } from "react";
-import { AlertTriangle, Check, LoaderCircle, Plus, Trash2 } from "lucide-react";
+import { useId, useMemo, useRef, useState, type RefObject } from "react";
+import { AlertTriangle, Check, ExternalLink, LoaderCircle, Plus, Trash2 } from "lucide-react";
 import { useRouter } from "next/navigation";
+import { AlertDialog } from "@base-ui/react/alert-dialog";
 
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { Button } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
+import { readStoredDraft, useDraftProtection } from "@/components/draft-protection";
+import { FACTGRID } from "@/lib/factgrid/constants";
 
 export type MetadataValue =
   | { kind: "string"; value: string }
@@ -32,6 +35,7 @@ export interface EditableReference {
 
 export interface EditableStatement {
   id?: string | null;
+  baselineReadOnly?: boolean;
   rank: "preferred" | "normal" | "deprecated";
   mainsnak: EditableSnak;
   qualifiers: Record<string, EditableSnak[]>;
@@ -84,8 +88,22 @@ function cloneEntity(entity: EditableEntity): EditableEntity {
   return structuredClone(entity);
 }
 
+function prepareBaseline(entity: EditableEntity): EditableEntity {
+  const clone = cloneEntity(entity);
+  clone.statements = clone.statements.map((statement) => statement.id
+    ? statement
+    : { ...statement, baselineReadOnly: true });
+  return clone;
+}
+
 function same(left: unknown, right: unknown): boolean {
   return JSON.stringify(left) === JSON.stringify(right);
+}
+
+function submittedStatement(statement: EditableStatement): Omit<EditableStatement, "baselineReadOnly"> {
+  const copy = { ...statement };
+  delete copy.baselineReadOnly;
+  return copy;
 }
 
 function mapKeys(left: Record<string, unknown>, right: Record<string, unknown>): string[] {
@@ -121,13 +139,24 @@ export function buildMetadataOperations(initial: EditableEntity, draft: Editable
     if (statement.id && !draftById.has(statement.id)) operations.push({ type: "remove-statement", statementId: statement.id });
   }
   const initialById = new Map(initial.statements.flatMap((statement) => statement.id ? [[statement.id, statement] as const] : []));
+  const unmatchedBaselineIdless = initial.statements
+    .filter((statement) => !statement.id)
+    .map(submittedStatement);
   for (const statement of draft.statements) {
+    const submitted = submittedStatement(statement);
     const completeStatement = {
-      ...statement,
+      ...submitted,
       references: statement.references.filter((reference) =>
         Object.values(reference.snaks).some((snaks) => snaks.length > 0),
       ),
     };
+    if (!statement.id) {
+      const baselineIndex = unmatchedBaselineIdless.findIndex((candidate) => same(candidate, completeStatement));
+      if (baselineIndex >= 0) {
+        unmatchedBaselineIdless.splice(baselineIndex, 1);
+        continue;
+      }
+    }
     if (!statement.id || !same(initialById.get(statement.id), completeStatement)) {
       operations.push({ type: "upsert-statement", statement: completeStatement });
     }
@@ -265,7 +294,7 @@ function PropertyAdder({ label, definitions, onAdd, resolveProperty }: { label: 
   const [property, setProperty] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
-  return <div className="flex flex-col gap-2 sm:flex-row sm:items-end"><div className="min-w-0 flex-1"><Label htmlFor={id}>{label}</Label><input aria-describedby={error ? `${id}-error` : undefined} aria-invalid={Boolean(error)} className={`${inputClass} font-mono uppercase`} id={id} list={`${id}-properties`} onChange={(event) => { setProperty(event.target.value.toUpperCase()); setError(""); }} placeholder="P123" value={property} /><datalist id={`${id}-properties`}>{Object.values(definitions).map((definition) => <option key={definition.id} value={definition.id}>{definition.label}</option>)}</datalist>{error ? <p className="mt-2 text-sm text-destructive" id={`${id}-error`} role="alert">{error}</p> : null}</div><Button className="min-h-11 rounded-none" disabled={busy || !/^P[1-9]\d*$/.test(property)} onClick={async () => { setBusy(true); const definition = definitions[property] ?? await resolveProperty(property); setBusy(false); if (!definition) { setError("FactGrid did not return a definition for this property."); return; } onAdd(definition); setProperty(""); }} type="button" variant="outline">{busy ? <LoaderCircle aria-hidden="true" className="animate-spin" /> : <Plus aria-hidden="true" />} Add</Button></div>;
+  return <div className="flex flex-col gap-2 sm:flex-row sm:items-end"><div className="min-w-0 flex-1"><Label htmlFor={id}>{label}</Label><input aria-describedby={error ? `${id}-error` : undefined} aria-invalid={Boolean(error)} className={`${inputClass} font-mono uppercase`} id={id} list={`${id}-properties`} onChange={(event) => { setProperty(event.target.value.toUpperCase()); setError(""); }} placeholder="P123" value={property} /><datalist id={`${id}-properties`}>{Object.values(definitions).map((definition) => <option key={definition.id} value={definition.id}>{definition.label}</option>)}</datalist>{error ? <p className="mt-2 text-sm text-destructive" id={`${id}-error`} role="alert">{error}</p> : null}</div><Button className="min-h-11 rounded-none" disabled={busy || !/^P[1-9]\d*$/.test(property)} onClick={async () => { setBusy(true); const definition = definitions[property] ?? await resolveProperty(property); setBusy(false); if (!definition) { setError("FactGrid did not return a definition for this property."); return; } if (!definition.supported) { setError(definition.readOnlyReason ?? "This property cannot be edited safely."); return; } onAdd(definition); setProperty(""); }} type="button" variant="outline">{busy ? <LoaderCircle aria-hidden="true" className="animate-spin" /> : <Plus aria-hidden="true" />} Add</Button></div>;
 }
 
 function flattenSnaks(snaks: Record<string, EditableSnak[]>, order: string[]): EditableSnak[] {
@@ -287,34 +316,57 @@ function StatementEditor({ statement, index, definitions, onChange, onRemove, re
   const name = propertyName(definitions, statement.mainsnak.property);
   const allSnaks = [statement.mainsnak, ...flattenSnaks(statement.qualifiers, statement.qualifierOrder), ...statement.references.flatMap((reference) => flattenSnaks(reference.snaks, reference.snaksOrder))];
   const mainDefinition = definitions[statement.mainsnak.property];
-  const readOnly = mainDefinition?.supported === false || allSnaks.some((snak) => definitions[snak.property]?.supported === false || snak.value?.kind === "unsupported");
+  const readOnly = statement.baselineReadOnly === true || mainDefinition?.supported === false || allSnaks.some((snak) => definitions[snak.property]?.supported === false || snak.value?.kind === "unsupported");
   return <fieldset className="min-w-0 border border-border p-4 sm:p-6" disabled={readOnly}><legend className="max-w-full break-words px-2 font-heading text-xl font-medium">{name}</legend>{readOnly ? <p className="mb-4 border-l-2 border-border pl-3 text-sm text-muted-foreground">This statement contains an unsupported value or lacks a stable FactGrid statement ID, so it is preserved read only.</p> : null}<div className="flex flex-wrap items-end justify-between gap-3"><div className="w-full max-w-52"><Label htmlFor={`statement-${index}-rank`}>Rank</Label><select className={selectClass} id={`statement-${index}-rank`} onChange={(event) => onChange({ ...statement, rank: event.target.value as EditableStatement["rank"] })} value={statement.rank}><option value="preferred">Preferred</option><option value="normal">Normal</option><option value="deprecated">Deprecated</option></select></div><Button aria-label={`Remove statement ${name}`} className="min-h-11 rounded-none" onClick={onRemove} type="button" variant="destructive"><Trash2 aria-hidden="true" /> Remove statement</Button></div><div className="mt-5"><SnakEditor definition={definitions[statement.mainsnak.property]} onChange={(mainsnak) => onChange({ ...statement, mainsnak })} snak={statement.mainsnak} /></div><div className="mt-6 space-y-6"><SnakList definitions={definitions} onChange={(snaks) => { const grouped = groupSnaks(snaks); onChange({ ...statement, qualifiers: grouped.values, qualifierOrder: grouped.order }); }} resolveProperty={resolveProperty} snaks={flattenSnaks(statement.qualifiers, statement.qualifierOrder)} title="Qualifiers" /><fieldset className="space-y-5 border-l-2 border-border pl-4"><legend className="px-2 text-sm font-semibold">References</legend>{statement.references.map((reference, referenceIndex) => <div className="border-t border-border pt-4" key={reference.hash ?? `new-${referenceIndex}`}><div className="mb-3 flex justify-end"><Button aria-label={`Remove reference ${referenceIndex + 1} from ${name}`} onClick={() => onChange({ ...statement, references: statement.references.filter((_, indexToKeep) => indexToKeep !== referenceIndex) })} size="sm" type="button" variant="outline"><Trash2 aria-hidden="true" /> Remove reference</Button></div><SnakList definitions={definitions} onChange={(snaks) => { const grouped = groupSnaks(snaks); onChange({ ...statement, references: statement.references.map((item, itemIndex) => itemIndex === referenceIndex ? { ...item, snaks: grouped.values, snaksOrder: grouped.order } : item) }); }} resolveProperty={resolveProperty} snaks={flattenSnaks(reference.snaks, reference.snaksOrder)} title={`Reference ${referenceIndex + 1} values`} /></div>)}<Button onClick={() => onChange({ ...statement, references: [...statement.references, { snaks: {}, snaksOrder: [] }] })} type="button" variant="outline"><Plus aria-hidden="true" /> Add reference</Button></fieldset></div></fieldset>;
 }
 
-function ReviewDialog({ changes, catalogueChange, onCancel, onConfirm }: { changes: string[]; catalogueChange: boolean; onCancel: () => void; onConfirm: () => void }) {
+function ReviewDialog({ changes, catalogueChange, returnFocus, onCancel, onConfirm }: { changes: string[]; catalogueChange: boolean; returnFocus?: RefObject<HTMLButtonElement | null>; onCancel: () => void; onConfirm: () => void }) {
   const confirmRef = useRef<HTMLButtonElement>(null);
-  useEffect(() => { confirmRef.current?.focus(); }, []);
-  return <div aria-labelledby="change-review-title" aria-modal="true" className="fixed inset-0 z-50 grid place-items-center overflow-y-auto bg-foreground/45 p-4" onKeyDown={(event) => { if (event.key === "Escape") onCancel(); }} role="dialog"><div className="w-full max-w-2xl border border-border bg-background p-5 shadow-xl sm:p-7"><h3 className="font-heading text-2xl font-medium" id="change-review-title">Review changes before saving</h3><p className="mt-2 text-sm leading-6 text-muted-foreground">These changes will be written to the authoritative FactGrid item under your signed-in identity.</p>{catalogueChange ? <Alert className="mt-4 rounded-none" variant="destructive"><AlertTriangle aria-hidden="true" /><AlertTitle>Catalogue membership may change</AlertTitle><AlertDescription>This edit changes the tablet classification (P2) and could remove the record from this catalogue.</AlertDescription></Alert> : null}<ul className="mt-5 max-h-72 list-disc space-y-2 overflow-y-auto pl-5 text-sm">{changes.map((change, index) => <li className="break-words" key={`${change}-${index}`}>{change}</li>)}</ul><div className="mt-6 flex flex-wrap justify-end gap-3"><Button onClick={onCancel} type="button" variant="outline">Keep editing</Button><Button onClick={onConfirm} ref={confirmRef} type="button">Confirm and save</Button></div></div></div>;
+  return <AlertDialog.Root open onOpenChange={(open) => { if (!open) onCancel(); }}><AlertDialog.Portal><AlertDialog.Backdrop className="fixed inset-0 z-50 bg-foreground/45" /><AlertDialog.Viewport className="fixed inset-0 z-50 grid place-items-center overflow-y-auto p-4"><AlertDialog.Popup className="w-full max-w-2xl border border-border bg-background p-5 shadow-xl outline-none sm:p-7" finalFocus={returnFocus} initialFocus={confirmRef}><AlertDialog.Title className="font-heading text-2xl font-medium">Review changes before saving</AlertDialog.Title><AlertDialog.Description className="mt-2 text-sm leading-6 text-muted-foreground">These changes will be written to the authoritative FactGrid item under your signed-in identity.</AlertDialog.Description>{catalogueChange ? <Alert className="mt-4 rounded-none" variant="destructive"><AlertTriangle aria-hidden="true" /><AlertTitle>Catalogue membership may change</AlertTitle><AlertDescription>This edit changes the tablet classification (P2) and could remove the record from this catalogue.</AlertDescription></Alert> : null}<ul className="mt-5 max-h-72 list-disc space-y-2 overflow-y-auto pl-5 text-sm">{changes.map((change, index) => <li className="break-words" key={`${change}-${index}`}>{change}</li>)}</ul><div className="mt-6 flex flex-wrap justify-end gap-3"><AlertDialog.Close className={buttonVariants({ variant: "outline", className: "min-h-11 rounded-none" })}>Keep editing</AlertDialog.Close><button className={buttonVariants({ className: "min-h-11 rounded-none" })} onClick={onConfirm} ref={confirmRef} type="button">Confirm and save</button></div></AlertDialog.Popup></AlertDialog.Viewport></AlertDialog.Portal></AlertDialog.Root>;
 }
 
-export function MetadataEditor({ qid, csrfToken, initialModel }: { qid: string; csrfToken: string; initialModel: MetadataModel }) {
+type StoredMetadataDraft = {
+  draft: EditableEntity;
+  summary: string;
+  uncertainMessage?: string;
+};
+
+export function MetadataEditor({ qid, csrfToken, ownerId, initialModel }: { qid: string; csrfToken: string; ownerId: string; initialModel: MetadataModel }) {
   const router = useRouter();
   const errorRef = useRef<HTMLDivElement>(null);
-  const [baseline, setBaseline] = useState(() => cloneEntity(initialModel.entity));
-  const [draft, setDraft] = useState(() => cloneEntity(initialModel.entity));
+  const scope = `metadata:${qid}:${initialModel.entity.lastRevision}`;
+  const [restored] = useState(() => readStoredDraft<StoredMetadataDraft>(ownerId, scope));
+  const [baseline, setBaseline] = useState(() => prepareBaseline(initialModel.entity));
+  const [draft, setDraft] = useState(() => restored?.draft
+    ? cloneEntity(restored.draft)
+    : prepareBaseline(initialModel.entity));
   const [properties, setProperties] = useState(initialModel.properties);
-  const [summary, setSummary] = useState("");
-  const [saveState, setSaveState] = useState<SaveState>({ status: "idle" });
+  const [summary, setSummary] = useState(restored?.summary ?? "");
+  const [saveState, setSaveState] = useState<SaveState>(restored?.uncertainMessage
+    ? { status: "unknown", message: restored.uncertainMessage }
+    : { status: "idle" });
   const [reviewing, setReviewing] = useState(false);
   const operations = useMemo(() => buildMetadataOperations(baseline, draft), [baseline, draft]);
-  const dirty = operations.length > 0;
+  const hasOperations = operations.length > 0;
+  const draftChanged = hasOperations || summary.length > 0;
+  const outcomeLocked = saveState.status === "unknown";
+  useDraftProtection({
+    ownerId,
+    scope,
+    dirty: draftChanged,
+    draft: {
+      draft,
+      summary,
+      uncertainMessage: saveState.status === "unknown" ? saveState.message : undefined,
+    },
+    onDiscard: () => {
+      setDraft(cloneEntity(baseline));
+      setSummary("");
+      setReviewing(false);
+      setSaveState({ status: "idle" });
+    },
+  });
 
-  useEffect(() => {
-    if (!dirty) return;
-    const warn = (event: BeforeUnloadEvent) => event.preventDefault();
-    window.addEventListener("beforeunload", warn);
-    return () => window.removeEventListener("beforeunload", warn);
-  }, [dirty]);
 
   async function resolveProperty(property: string): Promise<PropertyDefinition | undefined> {
     try {
@@ -338,20 +390,21 @@ export function MetadataEditor({ qid, csrfToken, initialModel }: { qid: string; 
   const catalogueChange = operations.some((operation) => operation.type === "upsert-statement" && operation.statement.mainsnak.property === "P2" || operation.type === "remove-statement" && baseline.statements.find((statement) => statement.id === operation.statementId)?.mainsnak.property === "P2");
 
   async function save() {
-    if (!dirty || saveState.status === "saving") return;
+    if (!hasOperations || saveState.status === "saving" || outcomeLocked) return;
     setReviewing(false);
     setSaveState({ status: "saving" });
     try {
       const response = await fetch(`/api/tablets/${encodeURIComponent(qid)}/metadata`, { method: "PUT", headers: { "Content-Type": "application/json", "X-CSRF-Token": csrfToken }, body: JSON.stringify({ baseRevision: baseline.lastRevision, summary, confirmRemovals: operations.some((operation) => operation.type === "remove-statement" || operation.type === "upsert-statement" || operation.type === "set-aliases" && operation.values.length === 0 || operation.type === "set-sitelink" && operation.title === null || (operation.type === "set-label" || operation.type === "set-description") && operation.value === null), confirmCatalogueRemoval: catalogueChange, operations }) });
-      const body = await response.json().catch(() => ({})) as { entity?: EditableEntity; properties?: Record<string, PropertyDefinition>; revisionId?: number; message?: string; saveStatus?: "unknown" | "partial"; error?: { message?: string } };
+      const body = await response.json().catch(() => ({})) as { entity?: EditableEntity; properties?: Record<string, PropertyDefinition>; revisionId?: number; message?: string; saveStatus?: "unknown" | "accepted_unconfirmed" | "partial"; error?: { message?: string } };
       const message = body.message ?? body.error?.message;
+      if (body.saveStatus === "accepted_unconfirmed") { setSaveState({ status: "unknown", message: message ?? "FactGrid accepted this edit, but the saved revision could not be confirmed. Check item history before editing again." }); requestAnimationFrame(() => errorRef.current?.focus()); return; }
       if (response.status === 409) { setSaveState({ status: "conflict", message: message ?? "FactGrid has a newer revision. Your draft is preserved; reload and reapply it deliberately." }); requestAnimationFrame(() => errorRef.current?.focus()); return; }
       if (body.saveStatus === "unknown") { setSaveState({ status: "unknown", message: message ?? "FactGrid did not conclusively confirm this save. Your draft is preserved; check item history before retrying." }); requestAnimationFrame(() => errorRef.current?.focus()); return; }
       if (!response.ok || !body.entity) { setSaveState({ status: body.saveStatus === "partial" ? "partial" : "error", message: message ?? "FactGrid did not confirm the metadata save. Your draft is preserved." }); requestAnimationFrame(() => errorRef.current?.focus()); return; }
-      const confirmed = cloneEntity(body.entity);
+      const confirmed = prepareBaseline(body.entity);
       setBaseline(confirmed); setDraft(cloneEntity(confirmed)); setProperties((current) => ({ ...current, ...body.properties })); setSummary(""); setSaveState({ status: "saved", message: body.message ?? `Saved as entity revision ${body.revisionId ?? confirmed.lastRevision}.` }); router.refresh();
     } catch { setSaveState({ status: "unknown", message: "The response was interrupted, so the save status is unknown. Your draft is preserved; check FactGrid history before retrying." }); requestAnimationFrame(() => errorRef.current?.focus()); }
   }
 
-  return <section aria-labelledby="metadata-editor-title" id="metadata-draft" className="scroll-mt-28"><div className="flex flex-wrap items-end justify-between gap-3"><div><h2 className="font-heading text-3xl font-medium" id="metadata-editor-title">Edit metadata</h2><p className="mt-2 max-w-[72ch] text-sm leading-6 text-muted-foreground">Edit the complete FactGrid entity. IDs are preserved; unsupported datatypes remain visible and read only.</p></div><p className="font-mono text-xs text-muted-foreground">Revision {baseline.lastRevision}</p></div><div className="mt-7 space-y-7"><TermRows kind="Labels" onChange={(labels) => setDraft({ ...draft, labels })} values={draft.labels} /><TermRows kind="Descriptions" onChange={(descriptions) => setDraft({ ...draft, descriptions })} values={draft.descriptions} /><AliasesEditor onChange={(aliases) => setDraft({ ...draft, aliases })} values={draft.aliases} /><fieldset className="border border-border p-4 sm:p-5"><legend className="px-2 font-heading text-xl font-medium">Sitelinks</legend><div className="space-y-4">{Object.entries(draft.sitelinks).sort(([a], [b]) => a.localeCompare(b)).map(([site, value]) => <div className="grid min-w-0 gap-3 sm:grid-cols-[10rem_minmax(0,1fr)_auto] sm:items-end" key={site}><Field label="Site" onChange={() => undefined} readOnly value={site} /><Field label={`Title on ${site}`} onChange={(title) => setDraft({ ...draft, sitelinks: { ...draft.sitelinks, [site]: { ...value, title } } })} readOnly={false} value={value.title} /><Button aria-label={`Remove ${site} sitelink`} className="min-h-11 rounded-none" onClick={() => { const sitelinks = { ...draft.sitelinks }; delete sitelinks[site]; setDraft({ ...draft, sitelinks }); }} type="button" variant="outline"><Trash2 aria-hidden="true" /></Button></div>)}<div className="grid gap-3 sm:grid-cols-2"><Field label="Add site key" onChange={(site) => setDraft({ ...draft, sitelinks: site && !draft.sitelinks[site] ? { ...draft.sitelinks, [site]: { title: "", badges: [] } } : draft.sitelinks })} readOnly={false} value="" /></div></div></fieldset><section aria-labelledby="statements-title"><h3 className="font-heading text-2xl font-medium" id="statements-title">Statements</h3><p className="mt-2 text-sm text-muted-foreground">Multiple values, ranks, qualifiers, and references are preserved for each property.</p><div className="mt-5 space-y-6">{draft.statements.map((statement, index) => <StatementEditor definitions={properties} index={index} key={statement.id ?? `new-${index}`} onChange={(next) => setDraft({ ...draft, statements: draft.statements.map((item, itemIndex) => itemIndex === index ? next : item) })} onRemove={() => setDraft({ ...draft, statements: draft.statements.filter((_, itemIndex) => itemIndex !== index) })} resolveProperty={resolveProperty} statement={statement} />)}<PropertyAdder definitions={properties} label="Add statement property" onAdd={(definition) => setDraft({ ...draft, statements: [...draft.statements, { rank: "normal", mainsnak: defaultSnak(definition), qualifiers: {}, qualifierOrder: [], references: [] }] })} resolveProperty={resolveProperty} /></div></section><div><Label htmlFor="metadata-summary">Edit summary</Label><input className={inputClass} id="metadata-summary" maxLength={255} onChange={(event) => setSummary(event.target.value)} placeholder="Briefly describe these metadata changes" value={summary} /></div></div>{saveState.status !== "idle" && saveState.status !== "saving" ? <div className="mt-6" ref={errorRef} tabIndex={saveState.status === "saved" ? undefined : -1}><Alert className="rounded-none" variant={saveState.status === "saved" ? "default" : "destructive"}><>{saveState.status === "saved" ? <Check aria-hidden="true" /> : <AlertTriangle aria-hidden="true" />}</><AlertTitle>{saveState.status === "saved" ? "Save confirmed" : saveState.status === "conflict" ? "Revision conflict" : saveState.status === "partial" ? "Save partly completed" : "Draft not cleared"}</AlertTitle><AlertDescription>{saveState.message}</AlertDescription></Alert></div> : null}<div className="mt-6 flex flex-wrap items-center gap-3"><Button aria-busy={saveState.status === "saving"} className="min-h-11 rounded-none" disabled={!dirty || saveState.status === "saving"} onClick={() => setReviewing(true)} type="button">{saveState.status === "saving" ? <><LoaderCircle aria-hidden="true" className="animate-spin" /> Saving…</> : "Review and save"}</Button><Button className="min-h-11 rounded-none" disabled={!dirty || saveState.status === "saving"} onClick={() => { setDraft(cloneEntity(baseline)); setSummary(""); setSaveState({ status: "idle" }); }} type="button" variant="outline">Discard metadata changes</Button><span aria-live="polite" className="text-sm text-muted-foreground" role="status">{saveState.status === "saving" ? "Saving metadata to FactGrid…" : dirty ? `${operations.length} unsaved metadata change${operations.length === 1 ? "" : "s"}` : `Metadata synchronized at revision ${baseline.lastRevision}`}</span></div>{reviewing ? <ReviewDialog catalogueChange={catalogueChange} changes={changeDescriptions} onCancel={() => setReviewing(false)} onConfirm={save} /> : null}</section>;
+  return <section aria-labelledby="metadata-editor-title" id="metadata-draft" className="scroll-mt-28"><div className="flex flex-wrap items-end justify-between gap-3"><div><h2 className="font-heading text-3xl font-medium" id="metadata-editor-title">Edit metadata</h2><p className="mt-2 max-w-[72ch] text-sm leading-6 text-muted-foreground">Edit the complete FactGrid entity. IDs are preserved; unsupported datatypes remain visible and read only.</p></div><div className="flex flex-col items-end gap-2"><p className="font-mono text-xs text-muted-foreground">Revision {baseline.lastRevision}</p><a className="focus-ring inline-flex min-h-11 items-center gap-2 text-sm font-medium underline underline-offset-4" href={`${FACTGRID.wikiBase}Item:${qid}?action=history`} rel="noreferrer" target="_blank">FactGrid item history<ExternalLink aria-hidden="true" className="size-4" /></a></div></div><div className="mt-7 space-y-7"><TermRows kind="Labels" onChange={(labels) => setDraft({ ...draft, labels })} values={draft.labels} /><TermRows kind="Descriptions" onChange={(descriptions) => setDraft({ ...draft, descriptions })} values={draft.descriptions} /><AliasesEditor onChange={(aliases) => setDraft({ ...draft, aliases })} values={draft.aliases} /><fieldset className="border border-border p-4 sm:p-5"><legend className="px-2 font-heading text-xl font-medium">Sitelinks</legend><div className="space-y-4">{Object.entries(draft.sitelinks).sort(([a], [b]) => a.localeCompare(b)).map(([site, value]) => <div className="grid min-w-0 gap-3 sm:grid-cols-[10rem_minmax(0,1fr)_auto] sm:items-end" key={site}><Field label="Site" onChange={() => undefined} readOnly value={site} /><Field label={`Title on ${site}`} onChange={(title) => setDraft({ ...draft, sitelinks: { ...draft.sitelinks, [site]: { ...value, title } } })} readOnly={false} value={value.title} /><Button aria-label={`Remove ${site} sitelink`} className="min-h-11 rounded-none" onClick={() => { const sitelinks = { ...draft.sitelinks }; delete sitelinks[site]; setDraft({ ...draft, sitelinks }); }} type="button" variant="outline"><Trash2 aria-hidden="true" /></Button></div>)}<div className="grid gap-3 sm:grid-cols-2"><Field label="Add site key" onChange={(site) => setDraft({ ...draft, sitelinks: site && !draft.sitelinks[site] ? { ...draft.sitelinks, [site]: { title: "", badges: [] } } : draft.sitelinks })} readOnly={false} value="" /></div></div></fieldset><section aria-labelledby="statements-title"><h3 className="font-heading text-2xl font-medium" id="statements-title">Statements</h3><p className="mt-2 text-sm text-muted-foreground">Multiple values, ranks, qualifiers, and references are preserved for each property.</p><div className="mt-5 space-y-6">{draft.statements.map((statement, index) => <StatementEditor definitions={properties} index={index} key={statement.id ?? `new-${index}`} onChange={(next) => setDraft({ ...draft, statements: draft.statements.map((item, itemIndex) => itemIndex === index ? next : item) })} onRemove={() => setDraft({ ...draft, statements: draft.statements.filter((_, itemIndex) => itemIndex !== index) })} resolveProperty={resolveProperty} statement={statement} />)}<PropertyAdder definitions={properties} label="Add statement property" onAdd={(definition) => setDraft({ ...draft, statements: [...draft.statements, { rank: "normal", mainsnak: defaultSnak(definition), qualifiers: {}, qualifierOrder: [], references: [] }] })} resolveProperty={resolveProperty} /></div></section><div><Label htmlFor="metadata-summary">Edit summary</Label><input className={inputClass} id="metadata-summary" maxLength={255} onChange={(event) => setSummary(event.target.value)} placeholder="Briefly describe these metadata changes" value={summary} /></div></div>{saveState.status !== "idle" && saveState.status !== "saving" ? <div className="mt-6" ref={errorRef} tabIndex={saveState.status === "saved" ? undefined : -1}><Alert className="rounded-none" variant={saveState.status === "saved" ? "default" : "destructive"}><>{saveState.status === "saved" ? <Check aria-hidden="true" /> : <AlertTriangle aria-hidden="true" />}</><AlertTitle>{saveState.status === "saved" ? "Save confirmed" : saveState.status === "conflict" ? "Revision conflict" : saveState.status === "partial" ? "Save partly completed" : "Draft not cleared"}</AlertTitle><AlertDescription>{saveState.message}</AlertDescription></Alert></div> : null}<div className="mt-6 flex flex-wrap items-center gap-3"><Button aria-busy={saveState.status === "saving"} className="min-h-11 rounded-none" disabled={!hasOperations || saveState.status === "saving" || outcomeLocked} onClick={() => setReviewing(true)} type="button">{saveState.status === "saving" ? <><LoaderCircle aria-hidden="true" className="animate-spin" /> Saving…</> : "Review and save"}</Button><Button className="min-h-11 rounded-none" disabled={!draftChanged || saveState.status === "saving"} onClick={() => { setDraft(cloneEntity(baseline)); setSummary(""); setSaveState({ status: "idle" }); }} type="button" variant="outline">Discard metadata changes</Button><span aria-live="polite" className="text-sm text-muted-foreground" role="status">{saveState.status === "saving" ? "Saving metadata to FactGrid…" : outcomeLocked ? "Save outcome unknown; check FactGrid history or discard this local draft." : draftChanged ? (hasOperations ? `${operations.length} unsaved metadata change${operations.length === 1 ? "" : "s"}` : "Unsaved metadata summary") : `Metadata synchronized at revision ${baseline.lastRevision}`}</span></div>{reviewing ? <ReviewDialog catalogueChange={catalogueChange} changes={changeDescriptions} onCancel={() => setReviewing(false)} onConfirm={save} /> : null}</section>;
 }

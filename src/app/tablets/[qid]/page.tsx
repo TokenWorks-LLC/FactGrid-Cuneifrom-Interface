@@ -1,12 +1,13 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { connection } from "next/server";
 import { ArrowLeft, ExternalLink, FileText, ImageIcon, LockKeyhole, PencilLine } from "lucide-react";
 
 import { EditionComparison } from "@/components/edition-comparison";
 import { EditionEditGate } from "@/components/edition-edit-gate";
 import { Badge } from "@/components/ui/badge";
-import { isAllowedEditTarget, parseAllowedEditTargets } from "@/lib/edit/targets";
+import { isEditTargetEnabled, parseAllowedEditTargets } from "@/lib/edit/targets";
 import { FactGridNotFoundError, type LabeledEntity, type TabletEdition } from "@/lib/factgrid";
 import { getTablet } from "@/lib/factgrid/server";
 import { wikitextToPlainText } from "@/lib/wikitext-display";
@@ -32,6 +33,8 @@ export async function generateMetadata({ params }: TabletPageProps): Promise<Met
 }
 
 export default async function TabletPage({ params }: TabletPageProps) {
+  // Access messaging reflects the running deployment, not an ISR artifact.
+  await connection();
   const { qid } = await params;
   let tablet;
   try {
@@ -290,10 +293,10 @@ function EditionSection({
   const transcript = revision?.transcript;
   const sourceUrl = edition.reference?.url;
   const historyUrl = sourceUrl ? `${sourceUrl}?action=history` : undefined;
-  const targetEnabled = Boolean(
-    edition.reference && isAllowedEditTarget(edition.reference, allowedEditTargets),
+  const restrictedTargetEnabled = Boolean(
+    edition.reference && isEditTargetEnabled(edition.reference, "restricted", allowedEditTargets),
   );
-  const editEligible = Boolean(transcript?.editable && targetEnabled);
+  const editEligible = Boolean(transcript?.editable);
   const statusLabel =
     edition.status === "missing"
       ? "Missing page"
@@ -306,9 +309,7 @@ function EditionSection({
     ? !transcript.editable
       ? (transcript.reason ??
         "This source format is available for reading but is not safe for plain-text editing.")
-      : !targetEnabled
-        ? "This plain transcript is not on this deployment’s approved edit-target list."
-        : undefined
+      : undefined
     : undefined;
   const supportingSections = (revision?.sections ?? []).filter(
     (section) =>
@@ -406,14 +407,14 @@ function EditionSection({
             </div>
           ) : null}
 
-          {transcript?.editable && targetEnabled && edition.editionId && historyUrl ? (
+          {transcript?.editable && edition.editionId && historyUrl ? (
             <EditionEditGate
               editionId={edition.editionId}
               historyUrl={historyUrl}
               initialRevision={revision.revisionId}
               initialText={transcript.content}
               qid={qid}
-              targetEnabled
+              restrictedTargetEnabled={restrictedTargetEnabled}
             />
           ) : null}
 

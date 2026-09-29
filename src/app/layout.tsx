@@ -8,6 +8,7 @@ import {
 
 import { SiteFooter } from "@/components/site-footer";
 import { SiteHeader } from "@/components/site-header";
+import { DraftProtectionProvider } from "@/components/draft-protection";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { SITE } from "@/config/site";
 
@@ -56,16 +57,18 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
       className={`${sans.variable} ${serif.variable} ${mono.variable} ${cuneiform.variable}`}
     >
       <body className="min-h-dvh bg-background text-foreground antialiased">
-        <TooltipProvider>
-          <a className="skip-link" href="#main-content">
-            Skip to content
-          </a>
-          <div className="flex min-h-dvh flex-col">
-            <SiteHeader />
-            <div className="flex-1">{children}</div>
-            <SiteFooter />
-          </div>
-        </TooltipProvider>
+        <DraftProtectionProvider>
+          <TooltipProvider>
+            <a className="skip-link" href="#main-content">
+              Skip to content
+            </a>
+            <div className="flex min-h-dvh flex-col">
+              <SiteHeader />
+              <div className="flex-1">{children}</div>
+              <SiteFooter />
+            </div>
+          </TooltipProvider>
+        </DraftProtectionProvider>
       </body>
     </html>
   );

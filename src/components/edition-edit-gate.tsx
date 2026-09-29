@@ -12,7 +12,7 @@ type State =
   | { status: "anonymous" }
   | { status: "editing-disabled" }
   | { status: "denied"; username: string }
-  | { status: "allowed"; csrfToken: string };
+  | { status: "allowed"; csrfToken: string; ownerId: string };
 
 export interface EditionEditGateProps {
   qid: string;
@@ -20,16 +20,13 @@ export interface EditionEditGateProps {
   initialText: string;
   initialRevision: number;
   historyUrl: string;
-  targetEnabled: boolean;
+  restrictedTargetEnabled: boolean;
 }
 
 export function EditionEditGate(props: EditionEditGateProps) {
-  const [state, setState] = useState<State>(
-    props.targetEnabled ? { status: "checking" } : { status: "target-denied" },
-  );
+  const [state, setState] = useState<State>({ status: "checking" });
 
   useEffect(() => {
-    if (!props.targetEnabled) return;
     const controller = new AbortController();
     fetch("/api/session", { cache: "no-store", signal: controller.signal })
       .then(async (response) => {
@@ -40,14 +37,19 @@ export function EditionEditGate(props: EditionEditGateProps) {
           csrfToken?: string;
           editingEnabled?: boolean;
           editorApproved?: boolean;
-          user?: { username?: string };
+          contributorPolicy?: "restricted" | "authenticated";
+          user?: { id?: string; username?: string };
         };
         if (!body.authenticated) return { status: "anonymous" } as const;
         if (body.editingEnabled === false) return { status: "editing-disabled" } as const;
         if (!body.editorApproved || !body.csrfToken) {
           return { status: "denied", username: body.user?.username ?? "this account" } as const;
         }
-        return { status: "allowed", csrfToken: body.csrfToken } as const;
+        if (body.contributorPolicy !== "authenticated" && !props.restrictedTargetEnabled) {
+          return { status: "target-denied" } as const;
+        }
+        if (!body.user?.id) return { status: "unavailable" } as const;
+        return { status: "allowed", csrfToken: body.csrfToken, ownerId: body.user.id } as const;
       })
       .then(setState)
       .catch((error: unknown) => {
@@ -55,10 +57,10 @@ export function EditionEditGate(props: EditionEditGateProps) {
         setState({ status: "unavailable" });
       });
     return () => controller.abort();
-  }, [props.targetEnabled]);
+  }, [props.restrictedTargetEnabled]);
 
   if (state.status === "allowed") {
-    return <TransliterationEditor {...props} csrfToken={state.csrfToken} />;
+    return <TransliterationEditor {...props} csrfToken={state.csrfToken} ownerId={state.ownerId} />;
   }
 
   if (state.status === "checking") {

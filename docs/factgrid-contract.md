@@ -17,6 +17,12 @@ qualifier, reference, and sitelink modules. P251 and P69 are URL properties. The
 application treats effective rights, current blocks, reported OAuth grants, and its
 own contributor policy as separate checks. No live write established this contract.
 
+`wbeditentity` revision comments contain a generated Wikibase autocomment and may
+append the caller's custom summary. The boundary of that appended text is not
+uniquely recoverable, so confirmation requires the exact item revision and identity
+plus the provider's anchored `wbeditentity-update` operation marker; it does not
+use raw-comment equality or substring matching as attribution proof.
+
 ## Endpoints
 
 | Purpose | Endpoint |
@@ -98,6 +104,9 @@ byte-for-byte. New local pages use the server-derived `D-Q{qid}` title and a min
 `CuneiformInfoBox` / `Transcript` / `poem` source, then link the canonical URL through
 P251. P251 is read-only in the generic metadata editor so the restricted target
 policy cannot be bypassed; document creation and updates use dedicated workflows.
+That restriction includes nested qualifiers/references and generic removal or
+replacement of a statement that already carries P251. Existing legacy data is
+preserved during unrelated edits.
 Document preamble and other headed sections are exposed as source notes where
 they reduce to safe readable text.
 

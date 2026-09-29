@@ -5,7 +5,8 @@ import { validatePlainTranscriptReplacement } from "@/lib/factgrid/transcript";
 import type { Qid, WikibaseEntity, WikibaseStatement } from "@/lib/factgrid/types";
 
 import type { VerifiedEditorIdentity } from "./authorization";
-import { isAllowedEditTarget } from "./targets";
+import { isEditTargetEnabled } from "./targets";
+import { isWikibaseEditEntityComment } from "./wikibase-comment";
 
 type ServerFetch = typeof globalThis.fetch;
 
@@ -251,6 +252,12 @@ export interface TranscriptionCreationInspection {
   p251Values: readonly string[];
   p69Values: readonly string[];
   entityEditable: boolean;
+  entityRevision?: {
+    revisionId?: number;
+    username?: string;
+    userId?: string;
+    comment?: string;
+  };
   page: InspectedPage;
   csrfToken: string;
   requestStartedAt: string;
@@ -365,9 +372,25 @@ function isRecoverableOwnPage(
     Number.isSafeInteger(inspection.page.revisionId) &&
     (inspection.page.revisionId as number) > 0 &&
     inspection.page.source === source &&
+    inspection.page.contentModel === "wikitext" &&
+    inspection.page.contentFormat === "text/x-wiki" &&
     inspection.page.username === identity.username &&
     inspection.page.userId === identity.providerUserId &&
     inspection.page.comment === summary
+  );
+}
+
+function hasConfirmedLinkAttribution(
+  inspection: TranscriptionCreationInspection,
+  revisionId: number,
+  identity: VerifiedEditorIdentity,
+): boolean {
+  return (
+    inspection.entityRevisionId === revisionId &&
+    inspection.entityRevision?.revisionId === revisionId &&
+    inspection.entityRevision.username === identity.username &&
+    inspection.entityRevision.userId === identity.providerUserId &&
+    isWikibaseEditEntityComment(inspection.entityRevision.comment)
   );
 }
 
@@ -416,9 +439,9 @@ export async function createTranscription(
   // Policy is evaluated only against the exact server-derived destination. The
   // browser never supplies a title, host, or reference that could broaden it.
   if (
-    input.contributorPolicy === "restricted" &&
-    !isAllowedEditTarget(
+    !isEditTargetEnabled(
       { kind: "d", qid: input.qid, title, url },
+      input.contributorPolicy,
       input.allowedTargets,
     )
   ) {
@@ -566,11 +589,26 @@ export async function createTranscription(
           },
         );
       }
-      assertInspection(confirmed, input.qid, title);
+      try {
+        assertInspection(confirmed, input.qid, title);
+      } catch (cause) {
+        throw new TranscriptionCreationError(
+          "creation_confirmation_failed",
+          "FactGrid accepted the page creation, but the returned document metadata could not be confirmed. Check the page before trying again.",
+          {
+            status: 502,
+            state: initialState,
+            recovery: recovery(input.qid, pageRevisionId, "check_page"),
+            cause,
+          },
+        );
+      }
       if (
         !confirmed.page.exists ||
         confirmed.page.revisionId !== pageRevisionId ||
         confirmed.page.source !== source ||
+        confirmed.page.contentModel !== "wikitext" ||
+        confirmed.page.contentFormat !== "text/x-wiki" ||
         confirmed.page.username !== input.identity.username ||
         confirmed.page.userId !== input.identity.providerUserId ||
         confirmed.page.comment !== createSummary
@@ -624,18 +662,34 @@ export async function createTranscription(
       summary: linkSummary,
     });
   } catch (error) {
-    if (isTranscriptionCreationError(error) && error.code === "link_status_unknown") {
+    if (
+      isTranscriptionCreationError(error) &&
+      (error.code === "link_status_unknown" ||
+        (error.code === "provider_rejected_link" && error.status === 409))
+    ) {
       const reconciled = await inspectForRecovery(provider, input);
       if (reconciled?.p251Values.includes(url)) {
-        return {
-          status: "created_and_linked",
-          initialState,
-          title,
-          url,
-          pageRevisionId,
-          entityRevisionId: reconciled.entityRevisionId,
-          text: input.request.text,
-        };
+        try {
+          assertInspection(reconciled, input.qid, title);
+          return {
+            status: hasConfirmedLinkAttribution(
+              reconciled,
+              reconciled.entityRevisionId,
+              input.identity,
+            )
+              ? "created_and_linked"
+              : "already_available",
+            initialState,
+            title,
+            url,
+            pageRevisionId,
+            entityRevisionId: reconciled.entityRevisionId,
+            text: input.request.text,
+          };
+        } catch {
+          // Keep the original uncertain/conflict outcome when reconciliation
+          // does not describe the exact tablet and derived document target.
+        }
       }
     }
     if (isTranscriptionCreationError(error) && error.recovery) throw error;
@@ -674,9 +728,23 @@ export async function createTranscription(
       },
     );
   }
+  try {
+    assertInspection(confirmedLink, input.qid, title);
+  } catch (cause) {
+    throw new TranscriptionCreationError(
+      "link_confirmation_failed",
+      "FactGrid accepted the link, but the returned tablet metadata could not be confirmed. Check the tablet before trying again.",
+      {
+        status: 502,
+        state: initialState,
+        recovery: recovery(input.qid, pageRevisionId, "check_link"),
+        cause,
+      },
+    );
+  }
   if (
     !confirmedLink.p251Values.includes(url) ||
-    confirmedLink.entityRevisionId !== linked.revisionId
+    !hasConfirmedLinkAttribution(confirmedLink, linked.revisionId, input.identity)
   ) {
     throw new TranscriptionCreationError(
       "link_confirmation_failed",
@@ -1080,6 +1148,7 @@ export function createTranscriptionCreationProvider(
     }
 
     const revision = documentPage.revisions?.[0];
+    const entityRevision = entityPage.revisions?.[0];
     return {
       qid,
       entityRevisionId: entity.lastrevid as number,
@@ -1091,6 +1160,12 @@ export function createTranscriptionCreationProvider(
       p251Values: activeStringValues(entity, FACTGRID_PROPERTIES.documentPage),
       p69Values: activeStringValues(entity, FACTGRID_PROPERTIES.onlineTranscript),
       entityEditable: entityPage.actions?.edit === true,
+      entityRevision: {
+        revisionId: entityRevision?.revid,
+        username: entityRevision?.user,
+        userId: entityRevision?.userid === undefined ? undefined : String(entityRevision.userid),
+        comment: entityRevision?.comment,
+      },
       page: {
         exists: documentPage.missing !== true,
         title,

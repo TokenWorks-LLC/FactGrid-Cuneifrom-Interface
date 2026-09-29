@@ -64,6 +64,13 @@ identity, active rows are capped, and on POSIX the database file is forced to
 owner-only permissions. The SQLite file is operational session state, not a
 catalogue or account database.
 
+Every session is bound to the configured OAuth protocol, fixed issuer, and exact
+consumer/client registration. A configuration change, or a legacy row without
+those bindings, requires a fresh login. OAuth identity timestamps use one explicit
+30-second tolerance while preserving signature, issuer, audience, nonce, age, and
+expiry checks. Provider token/profile responses are streamed through a 64 KiB byte
+limit and individual token fields are capped before storage.
+
 This design expects one application instance with a persistent writable volume.
 Multiple replicas require a shared session-store implementation, which is outside
 this MVP.
@@ -78,6 +85,11 @@ default `restricted` contributor policy additionally requires exact username and
 target allowlists. The explicit `authenticated` policy removes those deployment
 allowlists, not the live FactGrid or current-record checks.
 
+Unauthenticated OAuth starts and callbacks are bounded before provider or
+session-store work. A checked-in nginx boundary rate-limits by source address and
+overwrites the application client-identity and forwarding headers; the bounded
+in-process limiter is defense in depth for the documented single instance.
+
 Three bounded mutation paths exist:
 
 1. Existing transcript update: the browser identifies the selected P251 statement
@@ -91,6 +103,9 @@ Three bounded mutation paths exist:
    sends one partial `wbeditentity` patch with `baserevid`. P2 removal/replacement
    requires explicit catalogue-membership confirmation. P251 is read-only in the
    general metadata editor and belongs to the dedicated transcript workflows.
+   Exact duplicate new statements (including duplicates of current claims) are
+   rejected without rewriting historical duplicates. Hashes are checked in their
+   actual statement/property/reference scope rather than globally.
 3. Missing transcript creation: the server derives `D-Q{qid}` and all wikitext,
    verifies current membership and transcript state, creates with `createonly`,
    confirms the page, and links it through a revision-guarded P251 metadata patch.
@@ -98,11 +113,13 @@ Three bounded mutation paths exist:
 
 Every successful path reads authoritative state back and checks the intended change,
 untouched data, revision, username/user ID attribution, and effective summary before
-reporting success. A post-submit network failure becomes an explicit unknown or
-partial outcome; it is not blindly retried. Creation recovery inspects deterministic
-upstream page and P251 state so a retry can finish an already-created-but-unlinked
-page without duplicating either resource. There is deliberately no local scholarly
-write journal.
+reporting success. A post-submit network failure becomes an explicit unknown,
+accepted-unconfirmed, or partial outcome as appropriate; it is not blindly retried.
+Wikibase attribution accepts the generated `wbeditentity-update` operation marker
+instead of claiming the appended custom summary can be recovered exactly. Creation
+recovery inspects deterministic upstream page and P251 state so a retry can finish
+an already-created-but-unlinked page without duplicating either resource. There is
+deliberately no local scholarly write journal.
 
 ## Rendering boundary
 
@@ -115,6 +132,12 @@ Eligible contributors can review and save metadata or create a missing local
 transcription. Existing supported transcript regions remain editable in edition
 context on the tablet page. Every write route independently verifies authorization;
 the client gate is presentation, not the security boundary.
+
+All three editors register with one account-scoped draft-protection layer. It
+guards application links and logout before navigation, retains the native unload
+warning, and restores scoped session drafts after reload or browser history
+traversal. Confirmed saves and deliberate discards clear only the relevant draft;
+unknown and accepted-unconfirmed outcomes retain it.
 
 React escapes record strings and transcript previews. Wikitext display is reduced to
 sanitized plain text; raw MediaWiki HTML is never injected. External URLs are
