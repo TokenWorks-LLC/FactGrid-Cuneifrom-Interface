@@ -6,7 +6,7 @@ live scholarly write has been performed.
 
 | Capability | Status | Evidence and boundary |
 |---|---|---|
-| Anonymous metadata/transliteration preview | Complete | Browser-only drafts, disabled saves, mutation-free desktop/mobile tests. |
+| Authenticated editor access | Complete | Signed-out visitors see a sign-in message; loading, unavailable, disabled, denied, and failed-load states expose no draft controls. Desktop/mobile tests cover these states. |
 | Existing plain local transcript update | Complete | Server-resolved P251 target, exact region splice, edit conflict parameters, `nocreate`, readback, and attribution checks. Only recognized plain `D-Q{qid}` regions qualify. |
 | Create a missing canonical local transcript | Complete | Server derives `D-Q{qid}` and canonical wikitext, uses `createonly`, verifies readback, then links P251 with `baserevid`; upstream-state reconciliation covers accepted/unknown and concurrent outcomes. |
 | Insert into an existing D page without a supported region | Partial | The page remains read-only. The service will not guess where to insert scholarly structure. |
@@ -24,7 +24,7 @@ live scholarly write has been performed.
 
 - Unit and contract tests cover parsing, authorization, metadata patching,
   creation/linking, conflicts, readback, attribution, partial outcomes, and recovery.
-- Deterministic Playwright tests cover anonymous, eligible metadata, and creation
+- Deterministic Playwright tests cover signed-out access denial, eligible metadata, and creation
   journeys at desktop and mobile widths.
 - Docker smoke tests cover the production image and isolated OAuth 1.0a/2.0 flows;
   the live browser smoke remains read-only and advisory.

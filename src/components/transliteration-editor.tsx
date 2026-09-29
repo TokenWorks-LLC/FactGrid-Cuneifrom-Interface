@@ -19,16 +19,11 @@ type SaveState =
 export type TransliterationEditorProps = {
   initialText: string;
   historyUrl: string;
-} & (
-  | { previewOnly: true; previewDescription: string }
-  | {
-      previewOnly?: false;
-      qid: string;
-      editionId: string;
-      initialRevision: number;
-      csrfToken: string;
-    }
-);
+  qid: string;
+  editionId: string;
+  initialRevision: number;
+  csrfToken: string;
+};
 
 export function TransliterationEditor(props: TransliterationEditorProps) {
   const { initialText, historyUrl } = props;
@@ -36,11 +31,11 @@ export function TransliterationEditor(props: TransliterationEditorProps) {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const [text, setText] = useState(initialText);
   const [savedText, setSavedText] = useState(initialText);
-  const [revision, setRevision] = useState(props.previewOnly ? 0 : props.initialRevision);
+  const [revision, setRevision] = useState(props.initialRevision);
   const [summary, setSummary] = useState("");
   const [saveState, setSaveState] = useState<SaveState>({ status: "idle" });
   const dirty = text !== savedText;
-  const draftChanged = dirty || (props.previewOnly && summary.length > 0);
+  const draftChanged = dirty || summary.length > 0;
 
   useEffect(() => {
     if (!draftChanged) return;
@@ -69,9 +64,7 @@ export function TransliterationEditor(props: TransliterationEditorProps) {
   }
 
   async function save() {
-    // Preview rendering and live authorization are deliberately separate. Even
-    // an accidental invocation of this handler cannot submit a preview draft.
-    if (props.previewOnly || !dirty || saveState.status === "saving") return;
+    if (!dirty || saveState.status === "saving") return;
     setSaveState({ status: "saving" });
 
     try {
@@ -150,9 +143,7 @@ export function TransliterationEditor(props: TransliterationEditorProps) {
             Edit transliteration
           </h2>
           <p className="mt-2 max-w-[65ch] text-sm leading-6 text-muted-foreground">
-            {props.previewOnly
-              ? props.previewDescription
-              : "Only the verified plain transcript region will change. Formatting and content outside that region remain byte-for-byte intact."}
+            Only the verified plain transcript region will change. Formatting and content outside that region remain byte-for-byte intact.
           </p>
         </div>
         <a
@@ -228,7 +219,7 @@ export function TransliterationEditor(props: TransliterationEditorProps) {
       ) : null}
 
       <div className="mt-6 flex flex-wrap items-center gap-3">
-        <Button aria-describedby={props.previewOnly ? `${editorId}-save-help` : undefined} className="min-h-11 rounded-none" disabled={props.previewOnly || !dirty || saveState.status === "saving"} onClick={save} type="button">
+        <Button className="min-h-11 rounded-none" disabled={!dirty || saveState.status === "saving"} onClick={save} type="button">
           {saveState.status === "saving" ? (
             <>
               <LoaderCircle aria-hidden="true" className="size-4 animate-spin" />
@@ -239,17 +230,12 @@ export function TransliterationEditor(props: TransliterationEditorProps) {
           )}
         </Button>
         <Button className="min-h-11 rounded-none" disabled={!draftChanged || saveState.status === "saving"} onClick={cancelChanges} type="button" variant="outline">
-          {props.previewOnly ? "Reset transcript draft" : "Cancel changes"}
+          Cancel changes
         </Button>
         <span aria-live="polite" className="text-sm text-muted-foreground">
-          {props.previewOnly ? (draftChanged ? "Draft changed · not saved" : "Preview ready") : dirty ? "Unsaved changes" : `Revision ${revision}`}
+          {dirty ? "Unsaved changes" : `Revision ${revision}`}
         </span>
       </div>
-      {props.previewOnly ? (
-        <p className="mt-3 text-sm leading-6 text-muted-foreground" id={`${editorId}-save-help`}>
-          Saving is unavailable in this preview. Approved editors can save supported editions from the tablet record after signing in.
-        </p>
-      ) : null}
     </section>
   );
 }

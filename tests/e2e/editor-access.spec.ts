@@ -10,58 +10,76 @@ function recordMutations(page: Page): string[] {
   return mutations;
 }
 
-test("anonymous users can preview metadata and transcripts without submitting writes", async ({ page }) => {
-  const mutations = recordMutations(page);
-  await page.goto("/tablets/Q9000002");
-  await page.getByRole("link", { name: "Edit record" }).click();
-  await expect(page).toHaveURL(/\/tablets\/Q9000002\/edit$/);
-  await expect(page.getByRole("heading", { level: 1, name: "Edit tablet record" })).toBeVisible();
-  await expect(page.getByText("Local draft preview", { exact: true })).toBeVisible();
+async function expectNoEditorControls(page: Page) {
+  await expect(page.locator("main input, main textarea, main select")).toHaveCount(0);
+  await expect(page.getByRole("button", { name: /Save to FactGrid|Review and save|Create and link/ })).toHaveCount(0);
+}
 
-  const title = page.getByRole("textbox", { name: "Record title", exact: true });
-  const originalTitle = await title.inputValue();
-  const literalMarkup = '<img src=x onerror="alert(1)"> š';
-  await title.fill(literalMarkup);
-  await expect(page.getByRole("region", { name: "Metadata preview" })).toContainText(literalMarkup);
-  await expect(page.getByRole("region", { name: "Metadata preview" }).locator("img")).toHaveCount(0);
-  await page.getByRole("textbox", { name: "Description", exact: true }).fill("A local metadata draft.");
-  await page.getByRole("textbox", { name: "Inventory numbers", exact: true }).fill("PREVIEW-1\nPREVIEW-2");
-  await expect(page.getByRole("button", { name: "Save metadata", exact: true })).toBeDisabled();
-  page.once("dialog", (dialog) => dialog.accept());
-  await page.getByRole("button", { name: "Reset metadata draft" }).click();
-  await expect(title).toHaveValue(originalTitle);
+for (const qid of ["Q9000001", "Q9000002"]) {
+  test(`anonymous visitors must sign in before opening the ${qid} editor`, async ({ page }) => {
+    const mutations = recordMutations(page);
+    const metadataRequests: string[] = [];
+    page.on("request", (request) => {
+      if (request.url().includes(`/api/tablets/${qid}/metadata`)) metadataRequests.push(request.url());
+    });
+    await page.route("**/api/session", (route) => route.fulfill({
+      contentType: "application/json", body: JSON.stringify({ authenticated: false }),
+    }));
+    await page.goto(`/tablets/${qid}`);
+    await page.getByRole("link", { name: "Edit record" }).click();
+    await expect(page).toHaveURL(new RegExp(`/tablets/${qid}/edit$`));
+    await expect(page.getByRole("heading", { name: "Sign in to edit", exact: true })).toBeVisible();
+    const login = page.locator("main").getByRole("link", { name: "Log in with FactGrid", exact: true });
+    await expect(login).toHaveAttribute("href", `/api/auth/login?returnTo=${encodeURIComponent(`/tablets/${qid}/edit`)}`);
+    await login.focus();
+    await expect(login).toBeFocused();
+    await expectNoEditorControls(page);
+    expect(metadataRequests).toEqual([]);
+    expect(mutations).toEqual([]);
+    expect(await page.locator("html").evaluate((element) => element.scrollWidth <= element.clientWidth)).toBe(true);
+  });
+}
 
-  const transcript = page.getByRole("textbox", { name: "Transliteration source", exact: true });
-  const initialTranscript = await transcript.inputValue();
-  await transcript.fill(literalMarkup);
-  await expect(page.getByLabel("Plain-text preview", { exact: true }).filter({ visible: true })).toHaveText(literalMarkup);
-  await page.getByRole("button", { name: "Insert ḫ", exact: true }).click();
-  await expect(transcript).toHaveValue(`${literalMarkup}ḫ`);
-  await expect(page.getByRole("button", { name: "Save to FactGrid", exact: true })).toBeDisabled();
-  await page.getByRole("combobox", { name: "Edition to preview" }).selectOption("1");
-  await expect(page.getByText("Its source format remains read-only", { exact: false }).filter({ visible: true })).toBeVisible();
-  await transcript.fill("Second edition draft");
-  await page.getByRole("combobox", { name: "Edition to preview" }).selectOption("0");
-  await expect(transcript).toHaveValue(`${literalMarkup}ḫ`);
-  page.once("dialog", (dialog) => dialog.accept());
-  await page.getByRole("button", { name: "Reset transcript draft" }).click();
-  await expect(transcript).toHaveValue(initialTranscript);
+for (const scenario of [
+  { name: "unconfigured", status: 503, session: {}, title: "Editing unavailable" },
+  { name: "disabled", status: 200, session: { authenticated: true, csrfToken: "fixture-csrf", editingEnabled: false, editorApproved: true }, title: "Editing disabled" },
+  { name: "denied", status: 200, session: { authenticated: true, csrfToken: "fixture-csrf", editingEnabled: true, editorApproved: false }, title: "Editing not permitted" },
+  { name: "missing CSRF", status: 200, session: { authenticated: true, editingEnabled: true, editorApproved: true }, title: "Editing not permitted" },
+]) {
+  test(`${scenario.name} access never falls back to public draft controls`, async ({ page }) => {
+    const mutations = recordMutations(page);
+    await page.route("**/api/session", (route) => route.fulfill({
+      status: scenario.status, contentType: "application/json", body: JSON.stringify(scenario.session),
+    }));
+    await page.goto("/tablets/Q9000001/edit");
+    await expect(page.getByRole("heading", { name: scenario.title, exact: true })).toBeVisible();
+    await expectNoEditorControls(page);
+    expect(mutations).toEqual([]);
+    if (scenario.name === "unconfigured") {
+      await expect(page.locator("main").getByRole("link", { name: "About FactGrid sign-in" })).toHaveAttribute("href", "/about#sign-in-availability");
+    }
+  });
+}
 
-  expect(await page.locator("html").evaluate((element) => element.scrollWidth <= element.clientWidth)).toBe(true);
-  expect(mutations).toEqual([]);
-});
-
-test("a tablet without a transcript still exposes a blank public editing preview", async ({ page }) => {
-  const mutations = recordMutations(page);
-  await page.goto("/tablets/Q9000001");
-  await expect(page.getByRole("heading", { name: "No transcript is linked" })).toBeVisible();
-  await page.getByRole("link", { name: "Edit record" }).click();
-  await expect(page.getByRole("heading", { name: "Try metadata changes", exact: true })).toBeVisible();
-  await expect(page.getByText("No local transcript is linked", { exact: false })).toBeVisible();
-  await page.getByRole("textbox", { name: "Transliteration source", exact: true }).fill("An empty-record practice draft.");
-  await expect(page.getByLabel("Plain-text preview", { exact: true })).toHaveText("An empty-record practice draft.");
-  await expect(page.getByRole("button", { name: "Save to FactGrid", exact: true })).toBeDisabled();
-  expect(mutations).toEqual([]);
+test("loading and failed metadata requests never expose a substitute editor", async ({ page }) => {
+  let release: () => void = () => {};
+  const pending = new Promise<void>((resolve) => { release = resolve; });
+  await page.route("**/api/session", (route) => route.fulfill({
+    contentType: "application/json", body: JSON.stringify({ authenticated: true, csrfToken: "fixture-csrf", editingEnabled: true, editorApproved: true }),
+  }));
+  await page.route("**/api/tablets/Q9000001/metadata*", async (route) => {
+    await pending;
+    await route.fulfill({ status: 502, contentType: "application/json", body: "{}" });
+  });
+  await page.goto("/tablets/Q9000001/edit");
+  try {
+    await expect(page.getByRole("heading", { name: "Checking edit access", exact: true })).toBeVisible();
+    await expectNoEditorControls(page);
+  } finally {
+    release();
+  }
+  await expect(page.getByRole("heading", { name: "Editor could not be loaded", exact: true })).toBeVisible();
+  await expectNoEditorControls(page);
 });
 
 test("authenticated eligible accounts can review and save multilingual metadata", async ({ page }) => {

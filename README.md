@@ -10,7 +10,7 @@ The MVP provides:
 - stable QID-based record pages with metadata, source-separated editions, image links, and external transcript links;
 - safe plain-text display of supported FactGrid document pages;
 - FactGrid OAuth 1.0a sign-in and signed API requests, with existing OAuth 2 support retained;
-- a public, zero-write editor preview with metadata and transliteration drafts;
+- editing controls available only to eligible signed-in contributors;
 - revision-aware editing for complete Wikibase item metadata, with unsupported
   property datatypes kept visibly read-only;
 - a deliberately narrow editor for one verified plain `D-Q…` transcript region;
@@ -20,10 +20,10 @@ The MVP provides:
 OAuth and writes are implemented and contract-tested, but are not configured
 or claimed as live-verified. They require a FactGrid-approved OAuth consumer, an
 approved contributor policy, and a designated write-test record. Public reading works
-without authentication. The preview is also public: choose **Edit record** on
-any tablet, or visit `/tablets/QID/edit`. Drafts stay in the current browser page
-and do not change FactGrid. Eligible signed-in contributors use the same route to
-review and save metadata or create a missing local transcription. Existing supported
+without authentication. Choose **Edit record** on any tablet, or visit
+`/tablets/QID/edit`. Signed-out visitors see a sign-in message and no draft controls.
+Eligible signed-in contributors can review and save metadata or create a missing
+local transcription. Existing supported
 transcriptions remain editable from their edition on the tablet record page.
 
 ## Quick start
@@ -37,7 +37,7 @@ npm run dev
 ```
 
 Open <http://127.0.0.1:3000>. The default empty OAuth settings intentionally put
-the site in public browsing and editor-preview mode. The shared desktop/mobile header still shows
+the site in public browsing mode with editing unavailable. The shared desktop/mobile header still shows
 `Log in with FactGrid`, marked `Unavailable`; it links to an explanation instead
 of a failing API response. With complete OAuth configuration the same entry starts
 the real provider flow and returns to the validated internal page. A signed-in

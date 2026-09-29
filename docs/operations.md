@@ -80,8 +80,8 @@ No secrets are required. Leave the OAuth fields empty and
 `FACTGRID_EDITING_ENABLED=false`. `/api/session` returns an unavailable status and
 the shared desktop/mobile header keeps `Log in with FactGrid` visible with an
 `Unavailable` status. That entry opens an accessible explanation rather than a
-raw API error. Public FactGrid reads and `/tablets/[qid]/edit` draft previews continue.
-No credentials are needed to try the preview; it cannot save to FactGrid.
+raw API error. Public FactGrid reads continue. `/tablets/[qid]/edit` shows an
+unavailable message without editing controls until sign-in and editing are configured.
 
 ## Enabling FactGrid sign-in
 
@@ -186,7 +186,7 @@ The default harness protocol is OAuth 1.0a. Set
 
 The required `test:e2e` check runs the full Next.js application at desktop and
 mobile widths against checked-in adapter fixtures. This keeps homepage, search,
-filtering, multi-edition navigation, transcript rendering, public draft previews, and unavailable-auth
+filtering, multi-edition navigation, transcript rendering, authenticated editor access, and unavailable-auth
 acceptance deterministic. Its one reported skip is only the duplicate desktop
 execution of an assertion that explicitly requires the mobile navigation layout;
 the mobile project runs that assertion.

@@ -167,8 +167,9 @@ extension constructs `iss` from MediaWiki's `CanonicalServer`; FactGrid's public
 site-info API reported that server origin and MediaWiki 1.43.6 on 28 September
 2026. A bare hostname is not accepted as an alternative issuer.
 
-The public editor preview is independent of these write permissions. Its metadata
-and transliteration drafts stay in browser memory and never update Wikibase.
+The editor opens only after a session check confirms an authenticated, eligible
+contributor. Signed-out, unavailable, disabled, or denied states expose no draft
+controls. The write routes independently enforce authorization on every save.
 
 ## Primary references
 

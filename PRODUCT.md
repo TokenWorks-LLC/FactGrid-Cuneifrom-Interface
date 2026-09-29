@@ -33,7 +33,7 @@ Readers arrive with tablet names, collection numbers, identifiers, periods, coll
 - FactGrid is the only scholarly record store; no local catalogue, search index, CMS, or password system is permitted.
 - Authentication uses FactGrid OAuth 1.0a (with legacy OAuth 2 retained) and requires consumer credentials, callback configuration, and session security. Sign-in is independent of the editor policy; actual writes also require that policy.
 - Existing transcript writes are limited to a server-resolved, supported FactGrid-hosted target associated with the selected tablet edition. New local transcripts use the server-derived `D-Q{qid}` convention and never import an external edition. Unsupported formats stay read-only.
-- Every tablet exposes a public editor preview for metadata and transliteration drafts, including sparse records. Preview drafts stay in the current page and cannot save to FactGrid.
+- Every tablet links to the editor. Signed-out visitors see a sign-in message; only eligible authenticated contributors receive editing controls. There is no public draft editor.
 - Eligible authenticated contributors can edit multilingual terms, sitelinks, and datatype-aware Wikibase statements, including ranks, qualifiers, references, and value/unknown/no-value states. Unsupported property datatypes remain visibly read-only.
 - Maps, 3D, annotations, uploads, creation of new tablet items, advanced linguistic search, dashboards, and a duplicate local scholarly store remain outside this release.
 - Live scholarly writes require a designated authorized test record. Fixtures may test behavior but must never be presented as live FactGrid data.
@@ -61,4 +61,4 @@ Readers arrive with tablet names, collection numbers, identifiers, periods, coll
 
 ## Accessibility & Inclusion
 
-The public reading and editing journeys must work with keyboard navigation, visible focus, readable contrast, responsive layouts, long identifiers, Unicode and diacritic text, reduced motion, and clear status/error language.
+The public reading and authenticated editing journeys must work with keyboard navigation, visible focus, readable contrast, responsive layouts, long identifiers, Unicode and diacritic text, reduced motion, and clear status/error language.

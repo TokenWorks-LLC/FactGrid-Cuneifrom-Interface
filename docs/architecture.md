@@ -89,8 +89,8 @@ Three bounded mutation paths exist:
    entity revision. The server reloads the full item and property definitions,
    validates statement GUIDs, qualifier/reference hashes and datatype values, then
    sends one partial `wbeditentity` patch with `baserevid`. P2 removal/replacement
-   requires explicit catalogue-membership confirmation; P251 values must be the
-   canonical fixed-host destination.
+   requires explicit catalogue-membership confirmation. P251 is read-only in the
+   general metadata editor and belongs to the dedicated transcript workflows.
 3. Missing transcript creation: the server derives `D-Q{qid}` and all wikitext,
    verifies current membership and transcript state, creates with `createonly`,
    confirms the page, and links it through a revision-guarded P251 metadata patch.
@@ -106,14 +106,36 @@ write journal.
 
 ## Rendering boundary
 
-`/tablets/[qid]/edit` is a unified progressive editor. Anonymous or ineligible
-visitors receive only in-memory draft controls with disabled saves. Eligible sessions
-load the uncached full entity DTO and expose review-before-save metadata controls and,
-when no local transcript exists, the canonical creation flow. Existing supported
-transcript regions continue to be edited in edition context on the tablet page.
-Client state never relaxes server checks or makes unsupported data writable.
+`/tablets/[qid]/edit` renders a public record header and an access message. It
+loads the uncached full entity DTO and mounts editing controls only after
+`/api/session` confirms an authenticated, eligible contributor. There is no second
+preview editor or fallback draft mode. Signed-out visitors receive a login link;
+unavailable, disabled, denied, and failed-load states display an explanation only.
+Eligible contributors can review and save metadata or create a missing local
+transcription. Existing supported transcript regions remain editable in edition
+context on the tablet page. Every write route independently verifies authorization;
+the client gate is presentation, not the security boundary.
 
-React escapes record strings and editor previews. Wikitext display is reduced to
+React escapes record strings and transcript previews. Wikitext display is reduced to
 sanitized plain text; raw MediaWiki HTML is never injected. External URLs are
 scheme-validated and rendered as outbound links. Record images remain links unless
 item-specific reuse rights are known.
+
+## Simplicity review — 29 September 2026
+
+The application remains one Next.js service with direct FactGrid API calls and a
+SQLite session store. There is no separate backend service, queue, local catalogue,
+scholarly write journal, or replica coordination. The temporary public draft editor
+has been removed, including its separate metadata form, per-edition practice
+drafts, hydration check, and preview-only branches in the transcription editor.
+The remaining paths correspond to the three actual operations: update a document,
+update an item, and create then link a document.
+
+The metadata and creation services are large (roughly 1,100–1,200 lines each).
+Datatype conversion, partial-entity updates, revision checks, and recovery between
+document creation and linking account for much of that size. They also duplicate
+some bounded-response parsing and provider-error handling. These are maintenance
+hotspots, not a reason to add a generic workflow framework or remove validation.
+Consolidate small helpers when those paths next change and retain their existing
+contract tests. OAuth 2 remains for documented compatibility; new deployments use
+OAuth 1.0a. No dependency or additional service was needed for this cleanup.
