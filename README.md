@@ -10,16 +10,21 @@ The MVP provides:
 - stable QID-based record pages with metadata, source-separated editions, image links, and external transcript links;
 - safe plain-text display of supported FactGrid document pages;
 - FactGrid OAuth 1.0a sign-in and signed API requests, with existing OAuth 2 support retained;
-- a public editor preview with metadata and transliteration drafts;
+- a public, zero-write editor preview with metadata and transliteration drafts;
+- revision-aware editing for complete Wikibase item metadata, with unsupported
+  property datatypes kept visibly read-only;
 - a deliberately narrow editor for one verified plain `D-Q…` transcript region;
-- fail-closed editing when OAuth, editor policy, or target allowlists are absent.
+- creation and P251 linking of a missing canonical `D-Q{qid}` transcription page;
+- fail-closed editing when OAuth, the feature switch, or contributor policy denies it.
 
-OAuth and live writes are implemented and contract-tested, but are not configured
+OAuth and writes are implemented and contract-tested, but are not configured
 or claimed as live-verified. They require a FactGrid-approved OAuth consumer, an
-approved editor policy, and a designated write-test record. Public reading works
-without authentication. The preview is also public: choose **Preview editor** on
+approved contributor policy, and a designated write-test record. Public reading works
+without authentication. The preview is also public: choose **Edit record** on
 any tablet, or visit `/tablets/QID/edit`. Drafts stay in the current browser page
-and do not change FactGrid. Metadata saving is not implemented in this release.
+and do not change FactGrid. Eligible signed-in contributors use the same route to
+review and save metadata or create a missing local transcription. Existing supported
+transcriptions remain editable from their edition on the tablet record page.
 
 ## Quick start
 
@@ -37,7 +42,10 @@ the site in public browsing and editor-preview mode. The shared desktop/mobile h
 of a failing API response. With complete OAuth configuration the same entry starts
 the real provider flow and returns to the validated internal page. A signed-in
 account name and logout replace it. Sign-in availability does not imply edit
-permission: editing remains separately switch- and allowlist-gated.
+permission: editing remains separately switch- and contributor-policy-gated. The
+default `restricted` policy requires exact editor and target allowlists; explicit
+`authenticated` mode still requires current FactGrid rights, OAuth grants, and
+record linkage.
 
 ## Commands
 
@@ -81,16 +89,18 @@ npx playwright install chromium             # macOS/Windows
 - [Architecture](docs/architecture.md)
 - [Verified FactGrid contract](docs/factgrid-contract.md)
 - [Deployment and operations](docs/operations.md)
+- [Editing capability matrix](docs/editing-capability-matrix.md)
 - [Product direction](PRODUCT.md)
 - [Design system](DESIGN.md)
 
 ## Scope
 
-This release does not provide maps, 3D viewing, tablet creation, saved metadata edits,
+This release does not provide maps, 3D viewing, creation of new Wikibase tablet items,
 uploads, annotation workflows, advanced linguistic search, a local scholarly
 database, or local revision history. Unsupported document formats remain readable
 where possible and link back to their source; they are never flattened into a
-single editable transcript.
+single editable transcript. Existing document pages without a safely recognized
+plain transcript region are not structurally rewritten.
 
 ## Data and attribution
 
@@ -101,8 +111,8 @@ the image.
 
 ## Current verification boundary
 
-A read-only coverage check on 21 September 2026 found two format-compatible plain
+A read-only coverage check refreshed on 29 September 2026 found two format-compatible plain
 D transcripts among all five current exact D-Q candidates. Both remain ineligible
 for writes in the default configuration because editing and the exact editor/target
-allowlists are closed. See the contract document for complete structured-property
-counts, bounded content samples, and the remaining read-only source families.
+allowlists are closed. No live write was made during implementation or verification.
+See the contract document and capability matrix for the supported and partial paths.

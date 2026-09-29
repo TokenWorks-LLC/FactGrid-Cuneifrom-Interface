@@ -90,10 +90,10 @@ consumer and FactGrid administrators can approve it. Use the
 [OAuth 1.0a registration form](https://database.factgrid.de/wiki/Special:OAuthConsumerRegistration/propose/oauth1a):
 
 1. register an application usable by other accounts, leaving owner-only mode off;
-2. request **Edit existing pages** and required basic access. The developer also
-   offered **Create, edit, and move pages** for the broader project; request it
-   only if that broader capability is intended. A grant alone does not implement
-   metadata editing or page creation in this interface;
+2. request **Edit existing pages** and required basic access. Also request
+   **Create, edit, and move pages** when missing-transcription creation is enabled.
+   The application verifies the reported grant and effective live rights; a grant
+   alone never authorizes a write;
 3. register the exact HTTPS callback
    `https://YOUR_ORIGIN/api/auth/callback`, with callback-prefix matching disabled.
    The application sends `oauth_callback=oob` to use that exact registered URL;
@@ -127,18 +127,27 @@ the account is absent from the editor allowlist.
 Do not enable writes merely because sign-in works. Obtain the cuneiform project’s
 editor policy and a designated test record first.
 
-1. Put exact approved FactGrid usernames in `FACTGRID_ALLOWED_EDITORS`.
-2. Put exact `QID|Document title` pairs in `FACTGRID_ALLOWED_EDIT_TARGETS`.
+1. Choose `FACTGRID_CONTRIBUTOR_POLICY=restricted` (the safe default) unless the
+   project has explicitly approved every authenticated FactGrid account with live
+   edit rights to contribute through this deployment.
+2. For `restricted`, put exact approved usernames in `FACTGRID_ALLOWED_EDITORS` and
+   exact `QID|Document title` pairs in `FACTGRID_ALLOWED_EDIT_TARGETS`. Empty lists
+   deny writes. For `authenticated`, these deployment lists are intentionally not
+   consulted; current membership/linkage and every provider-side check still apply.
 3. Set the designated test QID/title in the write-test variables for operator clarity.
 4. Set `FACTGRID_EDITING_ENABLED=true` only in the test deployment.
 5. Sign in as an approved user, make a harmless authorized change on that designated
    page, and verify the new revision and attribution in FactGrid history.
 6. Test stale-revision conflict, blocked/unapproved account denial, logout, and a
    direct request with a changed QID/edition ID.
-7. Expand target and editor allowlists only after project approval.
+7. Expand allowlists, or promote from `restricted` to `authenticated`, only after
+   project approval. Treat a policy change as a security-sensitive deployment change.
 
-The service checks live identity, rights, blocks, page protections, target linkage,
-source format, and base revision for each request. An empty allowlist denies writes.
+The service checks live identity, rights, blocks, reported grants, current catalogue
+membership/linkage, page action eligibility where applicable, datatypes, and base
+revision for each request. Metadata updates need the edit grant/right. Creating a
+new `D-Q{qid}` page also needs the create grant/right. Neither route accepts a
+browser-selected host, arbitrary document title, or raw metadata patch.
 
 Application logout removes the local application session. It does not revoke the
 provider grant; users can revoke that separately from FactGrid's connected-
@@ -212,8 +221,14 @@ reports success.
   configuration to revoke it, or rotate `SESSION_SECRET` and remove the session
   database to invalidate every outstanding session; revoke the FactGrid consumer
   as well if its credentials may be compromised.
-- **Signed in but no editor:** the feature switch, username allowlist, or target
-  allowlist is closed; this is the expected safe default.
+- **Signed in but no editor:** the feature switch or contributor policy is closed;
+  in `restricted` mode, also check the exact username and target allowlists. This is
+  the expected safe default.
+- **Metadata editor loads but a statement is disabled:** its datatype or shape is
+  not safely supported. Edit it in FactGrid; do not coerce it into another type.
+- **Transcription creation is partial:** inspect the canonical `D-Q{qid}` page and
+  the item P251 statements. Retry through the UI only after inspection; recovery
+  will derive state from FactGrid and link a confirmed canonical page if safe.
 - **409 conflict:** preserve the draft, inspect FactGrid history, reload, and reapply
   intentionally. Do not replay the prior request.
 - **Unknown save outcome:** check FactGrid history before trying again. The service

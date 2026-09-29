@@ -1,6 +1,8 @@
 # Verified FactGrid contract
 
-The contract below was checked read-only against FactGrid on 21 September 2026.
+The catalogue coverage below was checked read-only against FactGrid on 21 September
+2026; mutation capabilities and representative records were refreshed read-only on
+29 September 2026.
 It intentionally records uncertainty and avoids turning observed conventions into
 universal guarantees.
 
@@ -8,6 +10,12 @@ Authentication guidance was updated on 28 September 2026 following the project
 operator's correspondence with FactGrid developer Tinghui. The OAuth 1.0a flow
 below is implemented against MediaWiki's documented protocol; real FactGrid
 consumer approval and sign-in still require live acceptance.
+
+FactGrid reported MediaWiki 1.43.6. The inspected Wikibase API exposes
+`wbeditentity` with `baserevid`, partial entity updates, and the standard claim,
+qualifier, reference, and sitelink modules. P251 and P69 are URL properties. The
+application treats effective rights, current blocks, reported OAuth grants, and its
+own contributor policy as separate checks. No live write established this contract.
 
 ## Endpoints
 
@@ -84,9 +92,12 @@ or Transliteration section. Editing is restricted to an exact FactGrid-hosted
 `D-Q{qid}` page whose current wikitext has one plain region identified either by
 the exact `hasTransliteration` RDFa property or by that unique named-section rule.
 Structural wikitext and structured token rows remain read-only. The current P251
-statement, stable statement ID, exact deployment target allowlist, and all account
+statement, stable statement ID, applicable contributor policy, and all account
 checks are still required. Content outside the recognized region is preserved
-byte-for-byte.
+byte-for-byte. New local pages use the server-derived `D-Q{qid}` title and a minimal
+`CuneiformInfoBox` / `Transcript` / `poem` source, then link the canonical URL through
+P251. P251 is read-only in the generic metadata editor so the restricted target
+policy cannot be bypassed; document creation and updates use dedicated workflows.
 Document preamble and other headed sections are exposed as source notes where
 they reduce to safe readable text.
 
@@ -118,8 +129,9 @@ exceptions rather than false empty transcripts.
 
 Format compatibility is not permission eligibility. With the checked default
 configuration, **0 sources are permission-eligible** because editing is disabled
-and the editor and exact target allowlists are empty. A compatible D source becomes
-eligible only after project approval and an exact QID/title allowlist entry.
+and the restricted-policy editor and target allowlists are empty. A compatible D
+source becomes eligible only after project approval and either exact restricted-mode
+allowlist entries or an explicitly approved authenticated-mode deployment.
 
 ## Images and rights
 
@@ -143,8 +155,12 @@ retained for existing deployments. Identity-only access cannot write through the
 Action API. An approved non-owner-only consumer can be authorized by other
 FactGrid accounts without per-user administrator action. No published cuneiform-
 specific editor policy was found. Consequently,
-the application additionally requires a deployment-maintained exact username
-allowlist and exact target allowlist, and editing defaults to disabled.
+editing defaults to disabled. The default `restricted` contributor policy additionally
+requires a deployment-maintained exact username allowlist and exact target allowlist.
+An operator may explicitly select `authenticated` only after project approval; that
+mode omits deployment allowlists while retaining fresh identity, rights, blocks,
+reported grants, current catalogue membership/linkage, origin, CSRF, validation,
+conflict, and readback checks.
 
 Identity JWTs require the exact issuer `https://database.factgrid.de`. The OAuth
 extension constructs `iss` from MediaWiki's `CanonicalServer`; FactGrid's public

@@ -74,6 +74,15 @@ Editing is subordinate to reading. It appears only for a server-verified support
 target. The source context and base revision remain visible, destructive ambiguity
 is stated plainly, and save/cancel controls retain keyboard focus and touch sizing.
 
+The unified edit route has two explicit modes. Anonymous visitors see a local-draft
+banner and disabled save actions; eligible contributors see authoritative revision
+data and a review step before mutation. Metadata fields are grouped as terms,
+sitelinks, and statements. Statement rank, snak state, qualifiers, and references
+stay adjacent so provenance is never visually separated from the value it supports.
+Unsupported values disable their entire statement surface. Conflict and unknown-
+outcome messages preserve the draft and direct the contributor to reload or inspect
+FactGrid history.
+
 ## Accessibility
 
 Maintain semantic landmarks, a skip link, hierarchical headings, native labels,

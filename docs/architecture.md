@@ -70,38 +70,48 @@ this MVP.
 
 ## Write trust boundary
 
-Every edit is reconstructed and authorized on the server. A browser submits only
-the tablet QID, P251 statement GUID in the route, base revision, replacement text,
-and edit summary. It cannot choose a URL, wiki title, property, or operation.
+Every edit is reconstructed and authorized on the server. All write routes require
+the feature switch, exact origin, application CSRF token, a usable provider session,
+a fresh FactGrid identity, no current block, effective API rights, an applicable
+OAuth grant when the provider reports grants, and per-identity rate limits. The
+default `restricted` contributor policy additionally requires exact username and
+target allowlists. The explicit `authenticated` policy removes those deployment
+allowlists, not the live FactGrid or current-record checks.
 
-Before one non-retried `action=edit` request, the service verifies:
+Three bounded mutation paths exist:
 
-- complete auth configuration, feature switch, approved editor, and approved target;
-- exact request origin and application CSRF token;
-- a usable provider session (refreshed for OAuth 2 when necessary) and fresh FactGrid identity, block, and edit-right state;
-- current P251 membership and its exact fixed-host document title;
-- existing wikitext page, page protection/action eligibility, expected base revision,
-  and one supported plain `D-Q…` transcript region, identified either by the
-  exact transliteration RDFa property or by a unique poem in an exact Transcript
-  or Transliteration section;
-- bounded UTF-8 input with no structural wiki markup or forged poem boundary.
+1. Existing transcript update: the browser identifies the selected P251 statement
+   and supplies a base revision, replacement text, and summary. The server resolves
+   the current fixed-host page, verifies one supported plain transcript region and
+   page action eligibility, splices only that byte range, and sends `action=edit`
+   with `nocreate` and conflict parameters.
+2. Metadata update: the browser submits capped, typed operations against a base
+   entity revision. The server reloads the full item and property definitions,
+   validates statement GUIDs, qualifier/reference hashes and datatype values, then
+   sends one partial `wbeditentity` patch with `baserevid`. P2 removal/replacement
+   requires explicit catalogue-membership confirmation; P251 values must be the
+   canonical fixed-host destination.
+3. Missing transcript creation: the server derives `D-Q{qid}` and all wikitext,
+   verifies current membership and transcript state, creates with `createonly`,
+   confirms the page, and links it through a revision-guarded P251 metadata patch.
+   It never imports P69 or browser-supplied wiki structure.
 
-The adapter splices only the transcript byte range and preserves every byte outside
-it. FactGrid receives `nocreate`, revision conflict parameters, and an edit summary.
-The service then reads the saved revision back and confirms the revision and
-complete source text. For a changed save it also confirms the FactGrid username,
-user ID attribution, and effective edit summary.
-Network failures after submission are reported as an ambiguous outcome and are not
-blindly retried.
+Every successful path reads authoritative state back and checks the intended change,
+untouched data, revision, username/user ID attribution, and effective summary before
+reporting success. A post-submit network failure becomes an explicit unknown or
+partial outcome; it is not blindly retried. Creation recovery inspects deterministic
+upstream page and P251 state so a retry can finish an already-created-but-unlinked
+page without duplicating either resource. There is deliberately no local scholarly
+write journal.
 
 ## Rendering boundary
 
-`/tablets/[qid]/edit` is a public, in-memory draft preview. It reads the same public
-record data and exposes metadata and transliteration controls even when OAuth or
-live editing is unavailable. Preview mode has no save request path. It does not
-relax the write-route checks or make unsupported transcript formats writable.
-Metadata controls demonstrate the interface; Wikibase metadata mutations remain
-future work.
+`/tablets/[qid]/edit` is a unified progressive editor. Anonymous or ineligible
+visitors receive only in-memory draft controls with disabled saves. Eligible sessions
+load the uncached full entity DTO and expose review-before-save metadata controls and,
+when no local transcript exists, the canonical creation flow. Existing supported
+transcript regions continue to be edited in edition context on the tablet page.
+Client state never relaxes server checks or makes unsupported data writable.
 
 React escapes record strings and editor previews. Wikitext display is reduced to
 sanitized plain text; raw MediaWiki HTML is never injected. External URLs are
