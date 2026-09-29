@@ -90,8 +90,10 @@ npx playwright install chromium             # macOS/Windows
 - [Verified FactGrid contract](docs/factgrid-contract.md)
 - [Deployment and operations](docs/operations.md)
 - [Editing capability matrix](docs/editing-capability-matrix.md)
-- [Product direction](PRODUCT.md)
-- [Design system](DESIGN.md)
+
+`AGENTS.md`, `CLAUDE.md`, `DESIGN.md`, and `PRODUCT.md` are optional local
+contributor notes, intentionally untracked and ignored. Shared setup, architecture,
+and operating instructions remain in this README and `docs/`.
 
 ## Scope
 

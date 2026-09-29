@@ -47,3 +47,9 @@ next-env.d.ts
 # local browser test output
 /playwright-report/
 /test-results/
+
+# Local agent instructions and project notes
+/AGENTS.md
+/CLAUDE.md
+/DESIGN.md
+/PRODUCT.md
