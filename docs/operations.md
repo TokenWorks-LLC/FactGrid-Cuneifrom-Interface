@@ -66,10 +66,18 @@ permissions, and opener policies. Validate those headers after any proxy or CDN
 change; the proxy must not replace them with weaker values.
 
 Terminate public TLS at a reverse proxy and keep port 3000 private to that proxy.
+The checked-in `deploy/nginx/factgrid.conf.template` and
+`deploy/nginx/factgrid-proxy-headers.conf` provide the deployable boundary used by
+the test fixtures. Install them in nginx's `http` context, supply the documented
+TLS/upstream environment values, validate with `nginx -t`, and expose only nginx.
 Set `APP_ORIGIN` to the exact external HTTPS origin and register
 `${APP_ORIGIN}/api/auth/callback` verbatim. The proxy must replace, rather than
 append untrusted client values to, `Host`, `X-Forwarded-Host`, and
-`X-Forwarded-Proto`; forward the external host and `https`. Production cookies
+`X-Forwarded-Proto`; it must also overwrite `X-Forwarded-For` and
+`X-FactGrid-Client-IP`. Set `FACTGRID_TRUST_PROXY=true` only when direct access to
+the application port is impossible. With proxy trust disabled, arbitrary internet
+headers are ignored and the in-process fallback intentionally shares one bounded
+bucket. Production cookies
 are `Secure`, `HttpOnly`, `SameSite=Lax`, path-wide, and high priority, so a
 configured sign-in cannot be tested through direct plain HTTP. Never publish the
 backend port as an alternate sign-in origin.
@@ -110,6 +118,12 @@ they are not shared deployment configuration. There is no OAuth 1.0a refresh tok
 Local logout removes the application session; revoking the provider grant is a
 separate FactGrid action.
 
+Sessions are bound to the configured protocol, issuer, and exact consumer/client
+identifier. Changing any of them requires fresh login. Existing database rows
+created before this binding was stored fail closed; do not backfill a guessed
+registration. The migration itself is automatic and leaves legacy binding columns
+null for that reason.
+
 Existing OAuth 2 deployments can retain `FACTGRID_OAUTH_VERSION=2.0` with
 `FACTGRID_OAUTH_CLIENT_ID` and `FACTGRID_OAUTH_CLIENT_SECRET`. An omitted version
 also preserves that legacy behavior. Do not place OAuth 1.0a credentials into the
@@ -148,6 +162,14 @@ membership/linkage, page action eligibility where applicable, datatypes, and bas
 revision for each request. Metadata updates need the edit grant/right. Creating a
 new `D-Q{qid}` page also needs the create grant/right. Neither route accepts a
 browser-selected host, arbitrary document title, or raw metadata patch.
+
+Exact duplicate metadata additions are rejected before provider inspection,
+including a new statement identical to a current statement. Existing historical
+duplicates are preserved. P251 cannot be authored or removed through the generic
+metadata route, including qualifiers and references; use the dedicated transcript
+workflow. A definite revision followed by failed readback or attribution is shown
+as accepted but unconfirmed and must be reconciled in FactGrid history before a
+new workflow is started.
 
 Application logout removes the local application session. It does not revoke the
 provider grant; users can revoke that separately from FactGrid's connected-

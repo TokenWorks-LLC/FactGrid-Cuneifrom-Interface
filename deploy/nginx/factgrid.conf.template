@@ -1,0 +1,45 @@
+# Loaded inside nginx's http context by the official image. The application
+# upstream must be reachable only on a private network or loopback interface.
+limit_req_zone $binary_remote_addr zone=factgrid_oauth_login:10m rate=5r/m;
+limit_req_zone $binary_remote_addr zone=factgrid_oauth_callback:10m rate=10r/m;
+
+server {
+    listen 443 ssl;
+    server_name ${FACTGRID_SERVER_NAME};
+
+    ssl_certificate ${FACTGRID_TLS_CERTIFICATE};
+    ssl_certificate_key ${FACTGRID_TLS_CERTIFICATE_KEY};
+
+    client_header_timeout 10s;
+    client_body_timeout 10s;
+    client_max_body_size 1m;
+    large_client_header_buffers 4 16k;
+    limit_req_status 429;
+    error_page 429 = @factgrid_oauth_rate_limited;
+
+    location @factgrid_oauth_rate_limited {
+        add_header Cache-Control "private, no-store, max-age=0" always;
+        add_header Pragma "no-cache" always;
+        add_header Vary "Cookie" always;
+        add_header Retry-After "60" always;
+        default_type application/json;
+        return 429 '{"error":{"code":"rate_limited","message":"Too many sign-in attempts. Wait briefly before trying again."}}';
+    }
+
+    location = /api/auth/login {
+        limit_req zone=factgrid_oauth_login burst=5 nodelay;
+        include /etc/nginx/factgrid-proxy-headers.conf;
+        proxy_pass http://${FACTGRID_UPSTREAM};
+    }
+
+    location = /api/auth/callback {
+        limit_req zone=factgrid_oauth_callback burst=10 nodelay;
+        include /etc/nginx/factgrid-proxy-headers.conf;
+        proxy_pass http://${FACTGRID_UPSTREAM};
+    }
+
+    location / {
+        include /etc/nginx/factgrid-proxy-headers.conf;
+        proxy_pass http://${FACTGRID_UPSTREAM};
+    }
+}

@@ -17,6 +17,8 @@ const names = {
   network: `${prefix}-network`,
   provider: `${prefix}-provider`,
   providerImage: `${prefix}-provider-image`,
+  proxy: `${prefix}-proxy`,
+  proxyImage: `${prefix}-proxy-image`,
 };
 const temporaryDirectory = mkdtempSync(join(tmpdir(), `${prefix}-`));
 const sessionSecret = "docker-smoke-session-secret-32-bytes-minimum";
@@ -151,6 +153,7 @@ function appRunArguments(configured) {
       "FACTGRID_OAUTH_CALLBACK_URL=https://app.factgrid.test/api/auth/callback",
       `FACTGRID_OAUTH_VERSION=${oauthVersion}`,
       `SESSION_SECRET=${sessionSecret}`,
+      "FACTGRID_TRUST_PROXY=true",
     );
     environment.push(...(oauthVersion === "1.0a" ? [
       "FACTGRID_OAUTH_CONSUMER_KEY=synthetic-consumer",
@@ -168,9 +171,7 @@ function appRunArguments(configured) {
     "--network",
     names.network,
     "--network-alias",
-    "app.factgrid.test",
-    "--publish",
-    "127.0.0.1::3000",
+    "factgrid-app",
     "--mount",
     `type=volume,source=${names.dataVolume},target=/data`,
     "--mount",
@@ -203,11 +204,46 @@ const protectedPaths=['/app/.next','/app/.next/server/pages-manifest.json','/app
 for(const path of protectedPaths){const stat=f.statSync(path);if(stat.uid!==0||(stat.mode&0o022)!==0)throw new Error(path+' is not root-owned and read-only');try{f.accessSync(path,f.constants.W_OK);throw new Error(path+' is writable by the web uid')}catch(error){if(error?.code!=='EACCES')throw error}}
 const cache=f.statSync('/app/.next/cache');if(cache.uid!==1001||(cache.mode&0o777)!==0o700)throw new Error('cache ownership or mode is invalid');f.writeFileSync('/app/.next/cache/.write-check','ok',{mode:0o600});f.unlinkSync('/app/.next/cache/.write-check');`,
   ], { capture: true });
-  return publishedPort(names.app, 3000);
+}
+
+async function startProxy() {
+  docker([
+    "run", "--detach", "--name", names.proxy,
+    "--network", names.network,
+    "--network-alias", "app.factgrid.test",
+    "--publish", "127.0.0.1::443",
+    "--mount", `type=volume,source=${names.certVolume},target=/certs,readonly`,
+    "--env", "FACTGRID_SERVER_NAME=app.factgrid.test",
+    "--env", "FACTGRID_TLS_CERTIFICATE=/certs/provider-ca.pem",
+    "--env", "FACTGRID_TLS_CERTIFICATE_KEY=/certs/provider-key.pem",
+    "--env", `FACTGRID_UPSTREAM=${names.app}:3000`,
+    names.proxyImage,
+  ], { capture: true });
+  const port = publishedPort(names.proxy, 443);
+  const deadline = Date.now() + 30_000;
+  while (Date.now() < deadline) {
+    try {
+      const response = await request({
+        port,
+        path: "/api/session",
+        headers: forwardedHeaders,
+        tls: { ca: readFileSync(join(temporaryDirectory, "provider-ca.pem")), servername: "app.factgrid.test" },
+      });
+      if (response.status) return port;
+    } catch {
+      // nginx may still be starting.
+    }
+    await sleep(250);
+  }
+  throw new Error("The checked-in nginx boundary did not start in time.");
 }
 
 function stopApp() {
   docker(["rm", "--force", names.app], { capture: true, allowFailure: true });
+}
+
+function stopProxy() {
+  docker(["rm", "--force", names.proxy], { capture: true, allowFailure: true });
 }
 
 async function verifyUnavailableUi(appPort) {
@@ -266,7 +302,7 @@ async function run() {
   log("checking Docker daemon availability");
   docker(["info"], { capture: true, timeout: 30_000 });
 
-  log("building production and isolated provider images");
+  log("building production, proxy, and isolated provider images");
   docker(["build", "--tag", names.appImage, "."]);
   docker([
     "build",
@@ -274,6 +310,14 @@ async function run() {
     "tests/docker/Dockerfile.provider",
     "--tag",
     names.providerImage,
+    ".",
+  ]);
+  docker([
+    "build",
+    "--file",
+    "tests/docker/Dockerfile.proxy",
+    "--tag",
+    names.proxyImage,
     ".",
   ]);
 
@@ -301,7 +345,6 @@ async function run() {
   ], { capture: true });
   await waitForHealthy(names.provider);
   const providerPort = publishedPort(names.provider, 443);
-  const appProxyPort = publishedPort(names.provider, 8443);
   const caPath = join(temporaryDirectory, "provider-ca.pem");
   mkdirSync(temporaryDirectory, { recursive: true });
   docker(["cp", `${names.provider}:/fixture/server.crt`, caPath], { capture: true });
@@ -309,7 +352,7 @@ async function run() {
 
   log("verifying reading-only production behavior and login discoverability");
   await startApp(false);
-  let appPort = appProxyPort;
+  let appPort = await startProxy();
   const appTls = { ca: providerCa, servername: "app.factgrid.test" };
   const unavailable = await request({
     port: appPort,
@@ -329,11 +372,12 @@ async function run() {
     assertSecurityHeaders(response);
   }
   await verifyUnavailableUi(appPort);
+  stopProxy();
   stopApp();
 
   log(`completing synthetic OAuth ${oauthVersion} inside the production container`);
   await startApp(true);
-  appPort = appProxyPort;
+  appPort = await startProxy();
   const login = await request({
     port: appPort,
     path: "/api/auth/login?returnTo=%2Fabout%3Ffrom%3Ddocker%23sign-in-availability",
@@ -472,9 +516,10 @@ async function run() {
   assertNoSyntheticSecrets(wrongOrigin);
 
   log("replacing the container and confirming session persistence");
+  stopProxy();
   stopApp();
   await startApp(true);
-  appPort = appProxyPort;
+  appPort = await startProxy();
   sessionResponse = await request({
     port: appPort,
     path: "/api/session",
@@ -495,15 +540,17 @@ async function run() {
     },
     tls: appTls,
   });
-  assert.equal(logout.status, 204);
+  assert.equal(logout.status, 200);
+  assert.deepEqual(JSON.parse(logout.body), { signedOut: true, serverSessionRevoked: true });
   assertPrivate(logout);
   const cleared = cookie(logout.headers["set-cookie"], "factgrid_session");
   assert.match(cleared.header, /Max-Age=0/u);
 
   log("replacing the container again and confirming revocation persistence");
+  stopProxy();
   stopApp();
   await startApp(true);
-  appPort = appProxyPort;
+  appPort = await startProxy();
   const revoked = await request({
     port: appPort,
     path: "/api/session",
@@ -514,6 +561,38 @@ async function run() {
   assert.equal(JSON.parse(revoked.body).authenticated, false);
   assertPrivate(revoked);
   assertNoSyntheticSecrets(revoked);
+
+  log("exercising proxy header replacement and OAuth request limits");
+  let limited;
+  for (let index = 0; index < 15; index += 1) {
+    const response = await request({
+      port: appPort,
+      path: "/api/auth/login",
+      headers: {
+        ...forwardedHeaders,
+        "x-factgrid-client-ip": `198.51.100.${index + 1}`,
+        "x-forwarded-host": "attacker.invalid",
+        "x-forwarded-proto": "http",
+      },
+      tls: appTls,
+    });
+    if (response.status === 429) {
+      limited = response;
+      break;
+    }
+  }
+  assert.equal(limited?.status, 429, "The nginx login limit must reject a spoofed-header burst.");
+  assert.match(limited.headers["retry-after"] ?? "", /^\d+$/u);
+  assertPrivate(limited);
+
+  const otherClientStatus = docker([
+    "run", "--rm", "--network", names.network,
+    "--env", "NODE_TLS_REJECT_UNAUTHORIZED=0",
+    names.appImage,
+    "node", "-e",
+    `fetch('https://${names.proxy}/api/auth/login',{redirect:'manual',headers:{host:'app.factgrid.test'}}).then(r=>{if(r.status!==302){console.error(r.status);process.exit(1)}}).catch(()=>process.exit(1))`,
+  ], { capture: true, allowFailure: false });
+  assert.equal(otherClientStatus, "");
 
   stopApp();
   docker([
@@ -538,7 +617,7 @@ function cleanup(bestEffort = false) {
   if (cleanupStarted) return;
   cleanupStarted = true;
   log("removing only this run's uniquely named Docker resources");
-  for (const container of [names.app, names.provider, names.checker]) {
+  for (const container of [names.app, names.provider, names.proxy, names.checker]) {
     docker(["rm", "--force", container], {
       capture: true,
       allowFailure: true,
@@ -557,7 +636,7 @@ function cleanup(bestEffort = false) {
     allowFailure: true,
     timeout: 5_000,
   });
-  for (const image of [names.appImage, names.providerImage]) {
+  for (const image of [names.appImage, names.providerImage, names.proxyImage]) {
     docker(["image", "rm", "--force", image], {
       capture: true,
       allowFailure: true,
@@ -568,7 +647,7 @@ function cleanup(bestEffort = false) {
 
   if (!bestEffort) {
     const remaining = [];
-    for (const container of [names.app, names.provider, names.checker]) {
+    for (const container of [names.app, names.provider, names.proxy, names.checker]) {
       const found = docker(
         ["container", "ls", "--all", "--filter", `name=^/${container}$`, "--format", "{{.Names}}"],
         { capture: true },
@@ -587,7 +666,7 @@ function cleanup(bestEffort = false) {
       { capture: true },
     );
     if (network) remaining.push(`network:${network}`);
-    for (const image of [names.appImage, names.providerImage]) {
+    for (const image of [names.appImage, names.providerImage, names.proxyImage]) {
       const found = docker(
         ["image", "ls", "--filter", `reference=${image}:latest`, "--format", "{{.Repository}}:{{.Tag}}"],
         { capture: true },
