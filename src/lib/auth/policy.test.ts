@@ -36,6 +36,7 @@ describe("mutation policy", () => {
 describe("editor allowlist", () => {
   const configuration = {
     editingEnabled: true,
+    contributorPolicy: "restricted" as const,
     allowedEditors: new Set(["Exact Username"]),
   };
 
@@ -45,5 +46,13 @@ describe("editor allowlist", () => {
     expect(
       isApprovedEditor("Exact Username", { ...configuration, editingEnabled: false }),
     ).toBe(false);
+  });
+
+  it("allows any signed-in username only under the explicit authenticated policy", () => {
+    expect(isApprovedEditor("Any Contributor", {
+      ...configuration,
+      contributorPolicy: "authenticated",
+    })).toBe(true);
+    expect(isApprovedEditor("Any Contributor", configuration)).toBe(false);
   });
 });

@@ -9,7 +9,7 @@ import type {
 const POEM_OPEN = /<poem\b[^>]*>/gi;
 const TARGET_POEM_CLOSE = /<\/poem\s*>/gi;
 const STRUCTURAL_WIKITEXT =
-  /(?:\{\{|\[\[|<!--|-->|__[A-Z][A-Z0-9_]*__|^\s*\{\||^\s*\|\}|<\/?(?:span|ref|table|tbody|thead|tr|td|th|div|nowiki|gallery|script|style|iframe|object|embed|form|input|textarea|button|a)\b)/im;
+  /(?:\{\{|\[\[|\[(?:https?:)?\/\/|<!--|-->|__[A-Z][A-Z0-9_]*__|^\s*={2,6}.+={2,6}\s*$|^\s*-{4,}\s*$|^\s*\{\||^\s*\|\}|<\/?(?:span|ref|table|tbody|thead|tr|td|th|div|nowiki|gallery|script|style|iframe|object|embed|form|input|textarea|button|a|math|syntaxhighlight|source|code|pre|templatestyles|mapframe|maplink|score|timeline|graph|chem|hiero)\b)/im;
 const STRUCTURED_TRANSCRIPT_ROWS =
   /(?:^[ \t]*P[0-9A-Za-z]+:[^\t\r\n]+\t)|(?:^[ \t]*\d+(?:[-.]\d+)?\t(?:[^\t\r\n]*\t){2,})/m;
 

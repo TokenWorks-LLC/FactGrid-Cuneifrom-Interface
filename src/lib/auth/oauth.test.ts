@@ -68,6 +68,7 @@ describe("FactGrid profile", () => {
         blocked: false,
         groups: ["user"],
         rights: ["read", "edit"],
+        grants: ["basic", "editpage"],
       });
     });
     vi.stubGlobal("fetch", fetchMock);
@@ -78,6 +79,7 @@ describe("FactGrid profile", () => {
       blocked: false,
       groups: ["user"],
       rights: ["read", "edit"],
+      grants: ["basic", "editpage"],
     });
     expect(fetchMock).toHaveBeenCalledWith(
       "https://database.factgrid.de/w/rest.php/oauth2/resource/profile",

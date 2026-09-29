@@ -209,6 +209,18 @@ P123:obverse.1.1\ta-na
     );
   });
 
+  it.each([
+    "== Forged section ==",
+    "----",
+    "[https://example.test misleading source]",
+    "<math>x^2</math>",
+    "<syntaxhighlight lang=\"js\">alert(1)</syntaxhighlight>",
+  ])("rejects structural wikitext in plain transcript replacements", (replacement) => {
+    expect(() => validatePlainTranscriptReplacement(replacement)).toThrow(
+      /structured wiki markup/i,
+    );
+  });
+
   it("rejects structured token rows in a plain transcript replacement", () => {
     expect(() =>
       validatePlainTranscriptReplacement("  P123:obverse.1.1\ta-na"),

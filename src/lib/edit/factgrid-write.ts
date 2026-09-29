@@ -620,6 +620,7 @@ export interface SaveTranscriptInput {
   editionId: string;
   accessToken: string;
   identity: VerifiedEditorIdentity;
+  contributorPolicy?: "restricted" | "authenticated";
   request: TranscriptWriteRequest;
 }
 
@@ -652,7 +653,11 @@ export async function saveTranscript(
   const allowedTargets =
     dependencies.allowedTargets ??
     parseAllowedEditTargets(process.env.FACTGRID_ALLOWED_EDIT_TARGETS);
-  if (!edition.reference || !isAllowedEditTarget(edition.reference, allowedTargets)) {
+  if (
+    !edition.reference ||
+    (input.contributorPolicy !== "authenticated" &&
+      !isAllowedEditTarget(edition.reference, allowedTargets))
+  ) {
     throw new TranscriptEditError(
       "target_not_allowed",
       "This exact tablet and document page are not enabled for editing in this deployment.",

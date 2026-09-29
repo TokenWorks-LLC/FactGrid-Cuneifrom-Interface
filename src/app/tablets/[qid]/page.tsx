@@ -84,7 +84,7 @@ export default async function TabletPage({ params }: TabletPageProps) {
                 href={`/tablets/${tablet.qid}/edit`}
               >
                 <PencilLine aria-hidden="true" className="size-4" />
-                Preview editor
+                Edit record
               </Link>
               <a
                 className="focus-ring inline-flex min-h-11 items-center gap-2 self-start text-sm font-semibold underline decoration-primary/35 underline-offset-4 hover:decoration-primary lg:self-auto"

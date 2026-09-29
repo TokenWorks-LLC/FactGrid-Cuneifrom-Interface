@@ -28,6 +28,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
       expiresAt: new Date(session.expiresAt).toISOString(),
       csrfToken: session.csrfToken,
       editingEnabled: result.config.editingEnabled,
+      contributorPolicy: result.config.contributorPolicy,
       editorApproved: isApprovedEditor(session.username, result.config),
     });
   } catch {

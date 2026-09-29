@@ -23,7 +23,8 @@ export function hasValidCsrfToken(
 
 export function isApprovedEditor(
   username: string,
-  configuration: Pick<AuthConfiguration, "allowedEditors" | "editingEnabled">,
+  configuration: Pick<AuthConfiguration, "allowedEditors" | "contributorPolicy" | "editingEnabled">,
 ): boolean {
-  return configuration.editingEnabled && configuration.allowedEditors.has(username);
+  if (!configuration.editingEnabled) return false;
+  return configuration.contributorPolicy === "authenticated" || configuration.allowedEditors.has(username);
 }

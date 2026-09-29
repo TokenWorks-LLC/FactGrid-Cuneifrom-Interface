@@ -153,15 +153,25 @@ export interface WikibaseDataValue {
 export interface WikibaseSnak {
   snaktype?: string;
   property?: string;
+  hash?: string;
   datatype?: string;
   datavalue?: WikibaseDataValue;
 }
 
+export interface WikibaseReference {
+  hash?: string;
+  snaks?: Record<string, WikibaseSnak[]>;
+  "snaks-order"?: string[];
+}
+
 export interface WikibaseStatement {
   id?: string;
+  type?: string;
   rank?: "preferred" | "normal" | "deprecated";
   mainsnak?: WikibaseSnak;
   qualifiers?: Record<string, WikibaseSnak[]>;
+  "qualifiers-order"?: string[];
+  references?: WikibaseReference[];
 }
 
 export interface WikibaseTerm {
@@ -179,7 +189,39 @@ export interface WikibaseEntity {
   modified?: string;
   labels?: Record<string, WikibaseTerm>;
   descriptions?: Record<string, WikibaseTerm>;
+  aliases?: Record<string, WikibaseTerm[]>;
   claims?: Record<string, WikibaseStatement[]>;
+  sitelinks?: Record<
+    string,
+    {
+      site?: string;
+      title?: string;
+      badges?: string[];
+      url?: string;
+    }
+  >;
+  datatype?: string;
+}
+
+export interface WikibasePropertyDefinition {
+  id: PropertyId;
+  datatype: string;
+  labels: Record<string, WikibaseTerm>;
+  descriptions: Record<string, WikibaseTerm>;
+}
+
+/**
+ * Full-fidelity edit snapshot. Unlike TabletRecord, this intentionally keeps
+ * every language, statement, qualifier/reference hash and ordering field that
+ * FactGrid returned. Callers must still treat it as untrusted upstream data.
+ */
+export interface EditableTabletEntity {
+  entity: WikibaseEntity & {
+    id: Qid;
+    type: "item";
+    lastrevid: number;
+  };
+  properties: Record<PropertyId, WikibasePropertyDefinition>;
 }
 
 export interface WbGetEntitiesResponse {

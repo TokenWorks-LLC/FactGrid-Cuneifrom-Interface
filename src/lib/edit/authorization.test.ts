@@ -21,10 +21,12 @@ const profile: FactGridProfile = {
   blocked: false,
   groups: ["user"],
   rights: ["read", "edit"],
+  grants: ["basic", "editpage"],
 };
 
 const enabledPolicy = {
   editingEnabled: true,
+  contributorPolicy: "restricted" as const,
   allowedEditors: new Set(["Editor"]),
 };
 

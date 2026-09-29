@@ -9,10 +9,12 @@ import {
 import { FACTGRID, FACTGRID_LIMITS } from "./constants";
 import { FactGridError, FactGridNotFoundError, isFactGridError } from "./errors";
 import type {
+  EditableTabletEntity,
   MediaWikiPage,
   MediaWikiQueryResponse,
   MediaWikiSearchResponse,
   Qid,
+  PropertyId,
   SearchInput,
   SparqlResponse,
   TabletRecord,
@@ -21,6 +23,7 @@ import type {
   TabletSearchPage,
   WbGetEntitiesResponse,
   WikibaseEntity,
+  WikibasePropertyDefinition,
 } from "./types";
 import { normalizeSearchInput, parseEditionId, parseQid } from "./validation";
 import {
@@ -61,6 +64,43 @@ function chunks<T>(values: readonly T[], size: number): T[][] {
     result.push(values.slice(index, index + size));
   }
   return result;
+}
+
+const PROPERTY_ID_PATTERN = /^P[1-9][0-9]{0,14}$/u;
+
+function parsePropertyId(value: string): PropertyId {
+  if (!PROPERTY_ID_PATTERN.test(value)) {
+    throw new FactGridError("INVALID_INPUT", "Property ID must be a valid FactGrid PID.", {
+      status: 400,
+    });
+  }
+  return value as PropertyId;
+}
+
+function collectEntityPropertyIds(entity: WikibaseEntity): PropertyId[] {
+  const result = new Set<PropertyId>();
+  const add = (value: string | undefined) => {
+    if (value && PROPERTY_ID_PATTERN.test(value)) result.add(value as PropertyId);
+  };
+
+  for (const [property, statements] of Object.entries(entity.claims ?? {})) {
+    add(property);
+    if (!Array.isArray(statements)) continue;
+    for (const statement of statements) {
+      add(statement.mainsnak?.property);
+      for (const [qualifierProperty, snaks] of Object.entries(statement.qualifiers ?? {})) {
+        add(qualifierProperty);
+        for (const snak of snaks) add(snak.property);
+      }
+      for (const reference of statement.references ?? []) {
+        for (const [referenceProperty, snaks] of Object.entries(reference.snaks ?? {})) {
+          add(referenceProperty);
+          for (const snak of snaks) add(snak.property);
+        }
+      }
+    }
+  }
+  return [...result];
 }
 
 export function createFactGridClient(options: FactGridClientOptions = {}) {
@@ -253,6 +293,108 @@ export function createFactGridClient(options: FactGridClientOptions = {}) {
       }
     }
     return result;
+  }
+
+  async function getEditableTabletEntity(
+    qidValue: string,
+    additionalPropertyIds: readonly string[] = [],
+    requireCatalogueMembership = true,
+  ): Promise<EditableTabletEntity> {
+    const qid = parseQid(qidValue);
+    if (additionalPropertyIds.length > FACTGRID_LIMITS.maxWbgetentitiesBatch) {
+      throw new FactGridError("INVALID_INPUT", "Too many additional property definitions were requested.", {
+        status: 400,
+      });
+    }
+    const additional = additionalPropertyIds.map(parsePropertyId);
+    const response = await mediaWikiApi<WbGetEntitiesResponse>(
+      {
+        action: "wbgetentities",
+        format: "json",
+        formatversion: "2",
+        props: "info|labels|descriptions|aliases|claims|sitelinks",
+        ids: qid,
+      },
+      { cache: "no-store" },
+    );
+    const entity = response.entities?.[qid];
+    if (response.error || !entity || entity.missing) throw new FactGridNotFoundError(qid);
+    if (requireCatalogueMembership && !entityIsCuneiformTablet(entity)) {
+      throw new FactGridNotFoundError(qid, true);
+    }
+    if (
+      entity.id !== qid ||
+      entity.type !== "item" ||
+      !Number.isSafeInteger(entity.lastrevid) ||
+      (entity.lastrevid as number) <= 0
+    ) {
+      throw new FactGridError(
+        "UPSTREAM_PROTOCOL",
+        "FactGrid returned incomplete editable entity metadata.",
+        { status: 502 },
+      );
+    }
+
+    const propertyIds = [
+      ...new Set([...collectEntityPropertyIds(entity), ...additional]),
+    ];
+    if (propertyIds.length > FACTGRID_LIMITS.maxRelatedQids) {
+      throw new FactGridError(
+        "UPSTREAM_RESPONSE_TOO_LARGE",
+        "The tablet uses too many properties for the editor to load safely.",
+        { status: 502 },
+      );
+    }
+
+    const properties = {} as Record<PropertyId, WikibasePropertyDefinition>;
+    for (const batch of chunks(propertyIds, FACTGRID_LIMITS.maxWbgetentitiesBatch)) {
+      if (batch.length === 0) continue;
+      const propertyResponse = await mediaWikiApi<WbGetEntitiesResponse>(
+        {
+          action: "wbgetentities",
+          format: "json",
+          formatversion: "2",
+          props: "info|labels|descriptions|datatype",
+          ids: batch.join("|"),
+        },
+        { cache: "no-store" },
+      );
+      if (propertyResponse.error || !propertyResponse.entities) {
+        throw new FactGridError(
+          "UPSTREAM_PROTOCOL",
+          propertyResponse.error?.info ?? "FactGrid omitted property definitions.",
+          { status: 502 },
+        );
+      }
+      for (const propertyId of batch) {
+        const property = propertyResponse.entities[propertyId];
+        if (
+          !property ||
+          property.missing ||
+          property.id !== propertyId ||
+          property.type !== "property" ||
+          typeof property.datatype !== "string" ||
+          !property.datatype
+        ) {
+          throw new FactGridError(
+            "INVALID_INPUT",
+            `FactGrid does not expose a usable definition for ${propertyId}.`,
+            { status: additional.includes(propertyId) ? 400 : 502 },
+          );
+        }
+        properties[propertyId] = {
+          id: propertyId,
+          datatype: property.datatype,
+          labels: property.labels ?? {},
+          descriptions: property.descriptions ?? {},
+        };
+      }
+    }
+
+    return {
+      entity: entity as EditableTabletEntity["entity"],
+      properties,
+    };
   }
 
   async function labelsFor(entities: readonly WikibaseEntity[]): Promise<Map<string, string>> {
@@ -452,12 +594,19 @@ export function createFactGridClient(options: FactGridClientOptions = {}) {
     };
   }
 
-  return Object.freeze({ getTablet, getTabletFacets, resolveCurrentEdition, searchTablets });
+  return Object.freeze({
+    getEditableTabletEntity,
+    getTablet,
+    getTabletFacets,
+    resolveCurrentEdition,
+    searchTablets,
+  });
 }
 
 const defaultClient = createFactGridClient();
 
 export const getTablet = defaultClient.getTablet;
+export const getEditableTabletEntity = defaultClient.getEditableTabletEntity;
 export const getTabletFacets = defaultClient.getTabletFacets;
 export const resolveCurrentEdition = defaultClient.resolveCurrentEdition;
 export const searchTablets = defaultClient.searchTablets;

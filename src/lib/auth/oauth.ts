@@ -10,6 +10,8 @@ export interface FactGridProfile {
   blocked: boolean;
   groups: string[];
   rights: string[];
+  /** OAuth 1.0a grants / OAuth 2 scopes when the provider reports them. */
+  grants?: string[];
 }
 
 export interface ProviderTokens {
@@ -198,6 +200,11 @@ function parseProfile(profile: Record<string, unknown>): FactGridProfile {
     throw new Error("FactGrid profile response is invalid");
   }
 
+  const grants = Array.isArray(profile.grants)
+    ? stringArray(profile.grants)
+    : typeof profile.scope === "string"
+      ? profile.scope.split(/\s+/u).filter(Boolean)
+      : undefined;
   return {
     providerUserId,
     username,
@@ -205,6 +212,7 @@ function parseProfile(profile: Record<string, unknown>): FactGridProfile {
     blocked: profile.blocked !== false,
     groups: stringArray(profile.groups),
     rights: stringArray(profile.rights),
+    ...(grants ? { grants } : {}),
   };
 }
 

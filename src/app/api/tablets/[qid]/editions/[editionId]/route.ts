@@ -197,6 +197,7 @@ export async function PUT(
       editionId,
       accessToken: session.accessToken,
       identity,
+      contributorPolicy: configuration.contributorPolicy,
       request: writeRequest,
     }, { mediaWiki });
 

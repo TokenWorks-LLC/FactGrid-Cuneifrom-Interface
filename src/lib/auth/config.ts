@@ -20,6 +20,7 @@ export interface AuthConfiguration {
   sessionSecret: string;
   secureCookies: boolean;
   editingEnabled: boolean;
+  contributorPolicy: "restricted" | "authenticated";
   allowedEditors: ReadonlySet<string>;
   oauth: {
     issuer: string;
@@ -83,6 +84,10 @@ export function getAuthConfiguration(
   if (oauthVersion !== "1.0a" && oauthVersion !== "2.0") {
     invalid.push("FACTGRID_OAUTH_VERSION");
   }
+  const contributorPolicy = env.FACTGRID_CONTRIBUTOR_POLICY?.trim() || "restricted";
+  if (contributorPolicy !== "restricted" && contributorPolicy !== "authenticated") {
+    invalid.push("FACTGRID_CONTRIBUTOR_POLICY");
+  }
 
   if (missing.length > 0) {
     return { available: false, missing: [...missing], invalid };
@@ -136,6 +141,7 @@ export function getAuthConfiguration(
       sessionSecret: env.SESSION_SECRET!,
       secureCookies: production,
       editingEnabled: env.FACTGRID_EDITING_ENABLED === "true",
+      contributorPolicy: contributorPolicy as "restricted" | "authenticated",
       allowedEditors: parseAllowedEditors(env.FACTGRID_ALLOWED_EDITORS),
       oauth: {
         issuer: FACTGRID_OAUTH_ISSUER,

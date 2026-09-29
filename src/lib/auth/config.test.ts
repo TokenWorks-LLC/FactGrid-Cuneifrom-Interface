@@ -38,6 +38,7 @@ describe("getAuthConfiguration", () => {
     expect(result.config.oauth.tokenEndpoint).toBe(FACTGRID_OAUTH_TOKEN_URL);
     expect(result.config.oauth.profileEndpoint).toBe(FACTGRID_OAUTH_PROFILE_URL);
     expect(result.config.callbackUrl).toBe(completeEnvironment.FACTGRID_OAUTH_CALLBACK_URL);
+    expect(result.config.contributorPolicy).toBe("restricted");
   });
 
   it("requires separate consumer credentials when OAuth 1.0a is selected", () => {
@@ -75,6 +76,17 @@ describe("getAuthConfiguration", () => {
       NODE_ENV: "production",
     });
     expect(result.available).toBe(false);
+  });
+
+  it("accepts only explicit contributor policy values", () => {
+    expect(getAuthConfiguration({
+      ...completeEnvironment,
+      FACTGRID_CONTRIBUTOR_POLICY: "authenticated",
+    })).toMatchObject({ available: true, config: { contributorPolicy: "authenticated" } });
+    expect(getAuthConfiguration({
+      ...completeEnvironment,
+      FACTGRID_CONTRIBUTOR_POLICY: "open",
+    })).toMatchObject({ available: false, invalid: ["FACTGRID_CONTRIBUTOR_POLICY"] });
   });
 });
 

@@ -13,7 +13,10 @@ export interface VerifiedEditorIdentity {
 export function verifyFreshEditorProfile(
   session: StoredSession,
   profile: FactGridProfile,
-  configuration: Pick<AuthConfiguration, "allowedEditors" | "editingEnabled">,
+  configuration: Pick<
+    AuthConfiguration,
+    "allowedEditors" | "contributorPolicy" | "editingEnabled"
+  >,
 ): VerifiedEditorIdentity {
   if (!isApprovedEditor(session.username, configuration)) {
     throw new TranscriptEditError(
@@ -43,6 +46,17 @@ export function verifyFreshEditorProfile(
     throw new TranscriptEditError(
       "missing_edit_right",
       "This FactGrid account does not currently have the edit right.",
+      { status: 403 },
+    );
+  }
+  if (
+    profile.grants !== undefined &&
+    !profile.grants.includes("editpage") &&
+    !profile.grants.includes("createeditmovepage")
+  ) {
+    throw new TranscriptEditError(
+      "missing_edit_right",
+      "The connected FactGrid application was not granted permission to edit pages. Sign in again after the required grant is approved.",
       { status: 403 },
     );
   }
