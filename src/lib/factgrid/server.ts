@@ -463,6 +463,30 @@ export function createFactGridClient(options: FactGridClientOptions = {}) {
     return readOptions.includeDocuments === false ? record : loadDocumentPages(record);
   }
 
+  async function hasCanonicalTranscription(qidValue: string): Promise<boolean> {
+    const title = `D-${parseQid(qidValue)}`;
+    const response = await mediaWikiApi<MediaWikiQueryResponse>({
+      action: "query",
+      format: "json",
+      formatversion: "2",
+      prop: "info",
+      titles: title,
+    });
+    const pages = response.query?.pages;
+    const page = Array.isArray(pages) && pages.length === 1 ? pages[0] : undefined;
+    if (
+      response.error || !page || page.title !== title || page.ns !== 0 || page.invalid ||
+      (page.missing !== true && !(Number.isSafeInteger(page.pageid) && (page.pageid ?? 0) > 0))
+    ) {
+      throw new FactGridError(
+        "UPSTREAM_PROTOCOL",
+        "FactGrid returned invalid transcription page information.",
+        { status: 502, retryable: true },
+      );
+    }
+    return page.missing !== true;
+  }
+
   async function resolveCurrentEdition(
     qidValue: string,
     editionIdValue: string,
@@ -597,6 +621,7 @@ export function createFactGridClient(options: FactGridClientOptions = {}) {
   return Object.freeze({
     getEditableTabletEntity,
     getTablet,
+    hasCanonicalTranscription,
     getTabletFacets,
     resolveCurrentEdition,
     searchTablets,
@@ -606,6 +631,7 @@ export function createFactGridClient(options: FactGridClientOptions = {}) {
 const defaultClient = createFactGridClient();
 
 export const getTablet = defaultClient.getTablet;
+export const hasCanonicalTranscription = defaultClient.hasCanonicalTranscription;
 export const getEditableTabletEntity = defaultClient.getEditableTabletEntity;
 export const getTabletFacets = defaultClient.getTabletFacets;
 export const resolveCurrentEdition = defaultClient.resolveCurrentEdition;

@@ -144,11 +144,18 @@ editor policy and a designated test record first.
 1. Choose `FACTGRID_CONTRIBUTOR_POLICY=restricted` (the safe default) unless the
    project has explicitly approved every authenticated FactGrid account with live
    edit rights to contribute through this deployment.
-2. For `restricted`, put exact approved usernames in `FACTGRID_ALLOWED_EDITORS` and
-   exact `QID|Document title` pairs in `FACTGRID_ALLOWED_EDIT_TARGETS`. Empty lists
-   deny writes. For `authenticated`, these deployment lists are intentionally not
-   consulted; current membership/linkage and every provider-side check still apply.
+2. For `restricted`, put exact approved usernames in `FACTGRID_ALLOWED_EDITORS`.
+   An empty username list denies every write. Transcription updates and creation
+   additionally require exact `QID|Document title` pairs in
+   `FACTGRID_ALLOWED_EDIT_TARGETS`; an empty target list denies those operations.
+   Metadata writes do not consult the target list: an approved editor can edit any
+   current catalogue tablet, subject to FactGrid permissions and validation.
+   For `authenticated`, both deployment lists are intentionally ignored; current
+   membership/linkage and every provider-side check still apply.
 3. Set the designated test QID/title in the write-test variables for operator clarity.
+   These variables are not enforced by the application. A single transcription
+   target does not restrict metadata writes to that QID; agree the metadata test
+   scope with the approved tester before enabling writes.
 4. Set `FACTGRID_EDITING_ENABLED=true` only in the test deployment.
 5. Sign in as an approved user, make a harmless authorized change on that designated
    page, and verify the new revision and attribution in FactGrid history.
@@ -243,9 +250,10 @@ reports success.
   configuration to revoke it, or rotate `SESSION_SECRET` and remove the session
   database to invalidate every outstanding session; revoke the FactGrid consumer
   as well if its credentials may be compromised.
-- **Signed in but no editor:** the feature switch or contributor policy is closed;
-  in `restricted` mode, also check the exact username and target allowlists. This is
-  the expected safe default.
+- **Signed in but no editor:** check the feature switch and contributor policy;
+  in `restricted` mode, the username must be on the editor allowlist. The document-
+  target allowlist is an additional requirement for transcription saves and
+  creation, not for metadata edits.
 - **Metadata editor loads but a statement is disabled:** its datatype or shape is
   not safely supported. Edit it in FactGrid; do not coerce it into another type.
 - **Transcription creation is partial:** inspect the canonical `D-Q{qid}` page and

@@ -46,9 +46,12 @@ of a failing API response. With complete OAuth configuration the same entry star
 the real provider flow and returns to the validated internal page. A signed-in
 account name and logout replace it. Sign-in availability does not imply edit
 permission: editing remains separately switch- and contributor-policy-gated. The
-default `restricted` policy requires exact editor and target allowlists; explicit
-`authenticated` mode still requires current FactGrid rights, OAuth grants, and
-record linkage.
+default `restricted` policy requires an exact editor username allowlist for every
+write. Transcription updates and creation also require an exact document-target
+allowlist. Metadata edits by approved editors can affect any current catalogue
+tablet; the document-target list does not restrict them. Explicit `authenticated`
+mode ignores both deployment lists but still requires current FactGrid rights,
+OAuth grants, and applicable catalogue membership and document linkage.
 
 After FactGrid returns a definite revision, any later readback or attribution
 failure is reported as **accepted but unconfirmed**. The draft remains available,

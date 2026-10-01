@@ -15,7 +15,7 @@ async function expectNoEditorControls(page: Page) {
   await expect(page.getByRole("button", { name: /Save to FactGrid|Review and save|Create and link/ })).toHaveCount(0);
 }
 
-for (const qid of ["Q9000001", "Q9000002"]) {
+for (const qid of ["Q9000001", "Q9000002", "Q9000003"]) {
   test(`anonymous visitors must sign in before opening the ${qid} editor`, async ({ page }) => {
     const mutations = recordMutations(page);
     const metadataRequests: string[] = [];
@@ -113,6 +113,7 @@ test("authenticated eligible accounts can review and save multilingual metadata"
   await page.goto("/tablets/Q9000002/edit");
   await expect(page.getByLabel("Signed in as Fixture Editor")).toBeVisible();
   await expect(page.getByText("Editing FactGrid", { exact: true })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Add transcription", exact: true })).toHaveCount(0);
   const propertyInput = page.getByLabel("Add statement property");
   await propertyInput.fill("P251");
   await propertyInput.locator("..").locator("..").getByRole("button", { name: "Add", exact: true }).click();
@@ -141,20 +142,22 @@ test("authenticated eligible accounts can review and save multilingual metadata"
   ]));
 });
 
-test("authenticated eligible accounts can create and link a missing transcription", async ({ page }) => {
-  let creationBody: Record<string, unknown> | undefined;
-  await page.route("**/api/session", (route) => route.fulfill({ contentType: "application/json", body: JSON.stringify({ authenticated: true, csrfToken: "fixture-csrf", editingEnabled: true, editorApproved: true, user: { id: "17", username: "Fixture Editor" } }) }));
-  await page.route("**/api/tablets/Q9000001/metadata*", (route) => route.fulfill({ contentType: "application/json", body: JSON.stringify({ entity: { id: "Q9000001", lastRevision: 12, labels: { en: "Sparse tablet" }, descriptions: {}, aliases: {}, sitelinks: {}, statements: [] }, properties: {} }) }));
-  await page.route("**/api/tablets/Q9000001/transcription", async (route) => {
-    creationBody = route.request().postDataJSON() as Record<string, unknown>;
-    await route.fulfill({ status: 201, contentType: "application/json", body: JSON.stringify({ status: "created_and_linked", title: "D-Q9000001", url: "https://database.factgrid.de/wiki/D-Q9000001", pageRevisionId: 88, entityRevisionId: 13 }) });
+for (const qid of ["Q9000001", "Q9000003"]) {
+  test(`authenticated eligible accounts can create a missing transcription for ${qid}`, async ({ page }) => {
+    let creationBody: Record<string, unknown> | undefined;
+    await page.route("**/api/session", (route) => route.fulfill({ contentType: "application/json", body: JSON.stringify({ authenticated: true, csrfToken: "fixture-csrf", editingEnabled: true, editorApproved: true, user: { id: "17", username: "Fixture Editor" } }) }));
+    await page.route(`**/api/tablets/${qid}/metadata*`, (route) => route.fulfill({ contentType: "application/json", body: JSON.stringify({ entity: { id: qid, lastRevision: 12, labels: { en: "Sparse tablet" }, descriptions: {}, aliases: {}, sitelinks: {}, statements: [] }, properties: {} }) }));
+    await page.route(`**/api/tablets/${qid}/transcription`, async (route) => {
+      creationBody = route.request().postDataJSON() as Record<string, unknown>;
+      await route.fulfill({ status: 201, contentType: "application/json", body: JSON.stringify({ status: qid === "Q9000003" ? "created" : "created_and_linked", title: `D-${qid}`, url: `https://database.factgrid.de/wiki/D-${qid}`, pageRevisionId: 88, entityRevisionId: 13 }) });
+    });
+    await page.goto(`/tablets/${qid}/edit`);
+    await page.getByRole("textbox", { name: "Transliteration source", exact: true }).fill("1. a-na EN");
+    await page.getByRole("button", { name: "Create and link on FactGrid" }).click();
+    await expect(page.getByText("Creation confirmed", { exact: true })).toBeVisible();
+    expect(creationBody).toMatchObject({ text: "1. a-na EN" });
   });
-  await page.goto("/tablets/Q9000001/edit");
-  await page.getByRole("textbox", { name: "Transliteration source", exact: true }).fill("1. a-na EN");
-  await page.getByRole("button", { name: "Create and link on FactGrid" }).click();
-  await expect(page.getByText("Creation confirmed", { exact: true })).toBeVisible();
-  expect(creationBody).toMatchObject({ text: "1. a-na EN" });
-});
+}
 
 test("accepted-unconfirmed transcription creation remains locked until deliberate discard", async ({ page }) => {
   let writes = 0;

@@ -81,9 +81,12 @@ Every edit is reconstructed and authorized on the server. All write routes requi
 the feature switch, exact origin, application CSRF token, a usable provider session,
 a fresh FactGrid identity, no current block, effective API rights, an applicable
 OAuth grant when the provider reports grants, and per-identity rate limits. The
-default `restricted` contributor policy additionally requires exact username and
-target allowlists. The explicit `authenticated` policy removes those deployment
-allowlists, not the live FactGrid or current-record checks.
+default `restricted` contributor policy additionally requires an exact username
+allowlist for all writes and an exact document-target allowlist for transcription
+updates and creation. Metadata writes by approved editors may affect any current
+catalogue tablet; they do not consult the document-target allowlist. The explicit
+`authenticated` policy removes those deployment allowlists, not the live FactGrid
+or current-record checks.
 
 Unauthenticated OAuth starts and callbacks are bounded before provider or
 session-store work. A checked-in nginx boundary rate-limits by source address and
@@ -110,6 +113,12 @@ Three bounded mutation paths exist:
    verifies current membership and transcript state, creates with `createonly`,
    confirms the page, and links it through a revision-guarded P251 metadata patch.
    It never imports P69 or browser-supplied wiki structure.
+
+The editor offers creation when no document is linked or the linked canonical
+`D-Q{qid}` page is missing. It checks the canonical page's existence without loading
+document revisions. Existing canonical pages, including unsupported formats, are
+not offered for creation. The save handler rechecks authoritative state and uses
+`createonly`; this display check never authorizes a write or permits overwriting.
 
 Every successful path reads authoritative state back and checks the intended change,
 untouched data, revision, username/user ID attribution, and effective summary before

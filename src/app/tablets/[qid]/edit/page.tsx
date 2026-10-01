@@ -5,7 +5,7 @@ import { ArrowLeft } from "lucide-react";
 import { TabletEditor } from "@/components/tablet-editor";
 import { Badge } from "@/components/ui/badge";
 import { FactGridNotFoundError } from "@/lib/factgrid";
-import { getTablet } from "@/lib/factgrid/server";
+import { getTablet, hasCanonicalTranscription } from "@/lib/factgrid/server";
 
 export const revalidate = 300;
 export const metadata: Metadata = {
@@ -22,6 +22,15 @@ export default async function TabletEditorPage({ params }: { params: Promise<{ q
     if (error instanceof FactGridNotFoundError) notFound();
     throw error;
   }
+
+  const hasCanonicalLink = tablet.editions.some(
+    (edition) => edition.reference?.title === `D-${tablet.qid}`,
+  );
+  // A P251 link may point to a page that has not been created yet. Check only
+  // that page's existence; metadata editing does not need document revisions.
+  const offerTranscriptionCreation = hasCanonicalLink
+    ? !(await hasCanonicalTranscription(tablet.qid))
+    : !tablet.editions.some((edition) => edition.reference);
 
   return (
     <main id="main-content">
@@ -43,7 +52,7 @@ export default async function TabletEditorPage({ params }: { params: Promise<{ q
       <div className="site-container py-10 sm:py-14">
         <TabletEditor
           key={tablet.qid}
-          offerTranscriptionCreation={!tablet.editions.some((edition) => edition.reference)}
+          offerTranscriptionCreation={offerTranscriptionCreation}
           qid={tablet.qid}
         />
       </div>

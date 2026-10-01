@@ -148,6 +148,39 @@ describe("FactGrid server search", () => {
 });
 
 describe("FactGrid document loading", () => {
+  it.each([
+    { name: "existing", page: { pageid: 42, ns: 0, title: "D-Q42" }, exists: true },
+    { name: "missing", page: { ns: 0, title: "D-Q42", missing: true }, exists: false },
+  ])("checks an $name canonical document without downloading revisions", async ({ page, exists }) => {
+    const fetchMock = vi.fn(async (input: URL | RequestInfo) => {
+      const url = new URL(String(input));
+      expect(url.origin).toBe("https://database.factgrid.de");
+      expect(Object.fromEntries(url.searchParams)).toEqual({
+        action: "query", format: "json", formatversion: "2", prop: "info", titles: "D-Q42",
+      });
+      return jsonResponse({ query: { pages: [page] } });
+    });
+    const client = createFactGridClient({ fetch: fetchMock as typeof fetch, revalidateSeconds: false });
+
+    await expect(client.hasCanonicalTranscription("Q42")).resolves.toBe(exists);
+    expect(fetchMock).toHaveBeenCalledOnce();
+  });
+
+  it.each([
+    { error: { code: "badrequest" } },
+    { query: { pages: [] } },
+    { query: { pages: [{ ns: 0, title: "D-Q42" }] } },
+    { query: { pages: [{ ns: 0, title: "D-Q43", missing: true }] } },
+    { query: { pages: [{ ns: 1, title: "D-Q42", missing: true }] } },
+  ])("does not classify invalid page information as a missing transcription", async (response) => {
+    const client = createFactGridClient({
+      fetch: vi.fn(async () => jsonResponse(response)) as typeof fetch,
+      revalidateSeconds: false,
+    });
+
+    await expect(client.hasCanonicalTranscription("Q42")).rejects.toMatchObject({ code: "UPSTREAM_PROTOCOL" });
+  });
+
   it("loads multiple P251 pages without the single-title rvlimit parameter", async () => {
     let calls = 0;
     const entity = {

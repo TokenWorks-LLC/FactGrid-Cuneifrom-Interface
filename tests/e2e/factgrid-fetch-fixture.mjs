@@ -8,6 +8,17 @@ const tablet = JSON.parse(
 const sparseTablet = JSON.parse(
   readFileSync(join(fixtureRoot, "entity-sparse-no-transcript.json"), "utf8"),
 ).response.entities.Q9000001;
+const linkedMissingTablet = JSON.parse(JSON.stringify(sparseTablet).replaceAll("Q9000001", "Q9000003"));
+linkedMissingTablet.id = "Q9000003";
+linkedMissingTablet.pageid = 9000003;
+linkedMissingTablet.claims.P251 = [{
+  id: "Q9000003$fixture-missing-document",
+  rank: "normal",
+  mainsnak: {
+    property: "P251", datatype: "url", snaktype: "value",
+    datavalue: { type: "string", value: "https://database.factgrid.de/wiki/D-Q9000003" },
+  },
+}];
 const revisions = JSON.parse(
   readFileSync(join(fixtureRoot, "document-revisions.json"), "utf8"),
 );
@@ -56,6 +67,7 @@ function json(value) {
 function entity(qid) {
   if (qid === "Q9000002") return tablet;
   if (qid === "Q9000001") return sparseTablet;
+  if (qid === "Q9000003") return linkedMissingTablet;
   return {
     id: qid,
     labels: { en: { language: "en", value: labels[qid] ?? qid } },
@@ -109,7 +121,7 @@ globalThis.fetch = async (input, init) => {
 
   if (url.searchParams.get("action") === "wbgetentities") {
     const ids = (url.searchParams.get("ids") ?? "").split("|").filter(Boolean);
-    const tabletRequest = ids.length === 1 && ["Q9000001", "Q9000002"].includes(ids[0]);
+    const tabletRequest = ids.length === 1 && ["Q9000001", "Q9000002", "Q9000003"].includes(ids[0]);
     const labelRequest = ids.length > 0 && ids.every((qid) => relatedQids.has(qid));
     if (!tabletRequest && !labelRequest) {
       throw new Error("Unexpected entity IDs in FactGrid acceptance fixture.");
@@ -129,14 +141,30 @@ globalThis.fetch = async (input, init) => {
     });
   }
 
+  if (url.searchParams.get("action") === "query" && url.searchParams.get("prop") === "info") {
+    const title = url.searchParams.get("titles");
+    if (!["D-Q9000002", "D-Q9000003"].includes(title)) {
+      throw new Error("Unexpected canonical document in FactGrid acceptance fixture.");
+    }
+    assertParameters(url, {
+      action: "query", format: "json", formatversion: "2", prop: "info", titles: title,
+    });
+    const page = title === "D-Q9000003"
+      ? { ns: 0, title, missing: true }
+      : { ns: 0, title, pageid: 9000002 };
+    return json({ query: { pages: [page] } });
+  }
+
   if (
     url.searchParams.get("action") === "query" &&
     url.searchParams.get("prop") === "revisions"
   ) {
     const requestedTitles = new Set((url.searchParams.get("titles") ?? "").split("|"));
+    const missingCanonical = requestedTitles.size === 1 && requestedTitles.has("D-Q9000003");
     if (
-      requestedTitles.size !== documentTitles.size ||
-      ![...documentTitles].every((title) => requestedTitles.has(title))
+      !missingCanonical &&
+      (requestedTitles.size !== documentTitles.size ||
+        ![...documentTitles].every((title) => requestedTitles.has(title)))
     ) {
       throw new Error("Unexpected document titles in FactGrid acceptance fixture.");
     }
@@ -152,7 +180,9 @@ globalThis.fetch = async (input, init) => {
     return json({
       ...revisions,
       query: {
-        pages: revisions.query.pages.filter((page) => requestedTitles.has(page.title)),
+        pages: missingCanonical
+          ? [{ ns: 0, title: "D-Q9000003", missing: true }]
+          : revisions.query.pages.filter((page) => requestedTitles.has(page.title)),
       },
     });
   }
