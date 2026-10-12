@@ -81,12 +81,16 @@ Every edit is reconstructed and authorized on the server. All write routes requi
 the feature switch, exact origin, application CSRF token, a usable provider session,
 a fresh FactGrid identity, no current block, effective API rights, an applicable
 OAuth grant when the provider reports grants, and per-identity rate limits. The
-default `restricted` contributor policy additionally requires an exact username
+optional `restricted` contributor policy additionally requires an exact username
 allowlist for all writes and an exact document-target allowlist for transcription
 updates and creation. Metadata writes by approved editors may affect any current
-catalogue tablet; they do not consult the document-target allowlist. The explicit
+catalogue tablet; they do not consult the document-target allowlist. The default
 `authenticated` policy removes those deployment allowlists, not the live FactGrid
 or current-record checks.
+
+Editing defaults to enabled when the switch is omitted; an explicit `false` or
+invalid switch value disables writes. Authentication and every other write check
+remain mandatory. Existing deployment settings override the new defaults.
 
 Unauthenticated OAuth starts and callbacks are bounded before provider or
 session-store work. A checked-in nginx boundary rate-limits by source address and

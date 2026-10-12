@@ -46,12 +46,18 @@ of a failing API response. With complete OAuth configuration the same entry star
 the real provider flow and returns to the validated internal page. A signed-in
 account name and logout replace it. Sign-in availability does not imply edit
 permission: editing remains separately switch- and contributor-policy-gated. The
-default `restricted` policy requires an exact editor username allowlist for every
+optional `restricted` policy requires an exact editor username allowlist for every
 write. Transcription updates and creation also require an exact document-target
 allowlist. Metadata edits by approved editors can affect any current catalogue
-tablet; the document-target list does not restrict them. Explicit `authenticated`
+tablet; the document-target list does not restrict them. The default `authenticated`
 mode ignores both deployment lists but still requires current FactGrid rights,
 OAuth grants, and applicable catalogue membership and document linkage.
+
+Editing is enabled by default once OAuth is configured and the user is authenticated.
+Set `FACTGRID_EDITING_ENABLED=false` to disable all writes. Existing deployment
+environment values override these defaults: when upgrading from reading/restricted
+mode, set `FACTGRID_EDITING_ENABLED=true` and
+`FACTGRID_CONTRIBUTOR_POLICY=authenticated`, then restart the application.
 
 After FactGrid returns a definite revision, any later readback or attribution
 failure is reported as **accepted but unconfirmed**. The draft remains available,
@@ -127,7 +133,7 @@ the image.
 ## Current verification boundary
 
 A read-only coverage check refreshed on 29 September 2026 found two format-compatible plain
-D transcripts among all five current exact D-Q candidates. Both remain ineligible
-for writes in the default configuration because editing and the exact editor/target
-allowlists are closed. No live write was made during implementation or verification.
+D transcripts among all five current exact D-Q candidates. Live write eligibility
+still requires configured OAuth and current FactGrid account permissions.
+No live write was made during implementation or verification.
 See the contract document and capability matrix for the supported and partial paths.

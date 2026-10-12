@@ -138,12 +138,27 @@ the account is absent from the editor allowlist.
 
 ## Enabling writes
 
-Do not enable writes merely because sign-in works. Obtain the cuneiform project’s
-editor policy and a designated test record first.
+Editing now defaults to enabled for authenticated contributors. OAuth configuration,
+valid sessions, and current FactGrid permissions remain mandatory. Retain a
+designated authorized test record for live acceptance.
 
-1. Choose `FACTGRID_CONTRIBUTOR_POLICY=restricted` (the safe default) unless the
-   project has explicitly approved every authenticated FactGrid account with live
-   edit rights to contribute through this deployment.
+For existing deployments, update any old explicit settings to:
+
+```env
+FACTGRID_EDITING_ENABLED=true
+FACTGRID_CONTRIBUTOR_POLICY=authenticated
+```
+
+Restart the application after updating its environment. Pulling new code does not
+override an existing `false` switch or `restricted` policy. The operator can always
+set `FACTGRID_EDITING_ENABLED=false` to return to reading-only mode.
+
+The university deployment uses `/cuneiform/`. Preserve its deployment-specific
+base-path changes when integrating this branch; upstream still assumes root-path
+hosting. Confirm the deployed OAuth callback matches the registered consumer.
+
+1. Use `FACTGRID_CONTRIBUTOR_POLICY=authenticated` (the default) for FactGrid
+   members with live edit rights. Choose `restricted` for an allowlisted pilot.
 2. For `restricted`, put exact approved usernames in `FACTGRID_ALLOWED_EDITORS`.
    An empty username list denies every write. Transcription updates and creation
    additionally require exact `QID|Document title` pairs in
@@ -156,7 +171,7 @@ editor policy and a designated test record first.
    These variables are not enforced by the application. A single transcription
    target does not restrict metadata writes to that QID; agree the metadata test
    scope with the approved tester before enabling writes.
-4. Set `FACTGRID_EDITING_ENABLED=true` only in the test deployment.
+4. Confirm `FACTGRID_EDITING_ENABLED=true` in the intended deployment.
 5. Sign in as an approved user, make a harmless authorized change on that designated
    page, and verify the new revision and attribution in FactGrid history.
 6. Test stale-revision conflict, blocked/unapproved account denial, logout, and a

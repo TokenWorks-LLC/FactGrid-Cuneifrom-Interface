@@ -38,7 +38,8 @@ describe("getAuthConfiguration", () => {
     expect(result.config.oauth.tokenEndpoint).toBe(FACTGRID_OAUTH_TOKEN_URL);
     expect(result.config.oauth.profileEndpoint).toBe(FACTGRID_OAUTH_PROFILE_URL);
     expect(result.config.callbackUrl).toBe(completeEnvironment.FACTGRID_OAUTH_CALLBACK_URL);
-    expect(result.config.contributorPolicy).toBe("restricted");
+    expect(result.config.contributorPolicy).toBe("authenticated");
+    expect(result.config.editingEnabled).toBe(true);
     expect(result.config.trustProxy).toBe(false);
   });
 
@@ -82,12 +83,27 @@ describe("getAuthConfiguration", () => {
   it("accepts only explicit contributor policy values", () => {
     expect(getAuthConfiguration({
       ...completeEnvironment,
+      FACTGRID_CONTRIBUTOR_POLICY: "restricted",
+      FACTGRID_EDITING_ENABLED: "false",
+    })).toMatchObject({ available: true, config: { contributorPolicy: "restricted", editingEnabled: false } });
+    expect(getAuthConfiguration({
+      ...completeEnvironment,
       FACTGRID_CONTRIBUTOR_POLICY: "authenticated",
     })).toMatchObject({ available: true, config: { contributorPolicy: "authenticated" } });
     expect(getAuthConfiguration({
       ...completeEnvironment,
       FACTGRID_CONTRIBUTOR_POLICY: "open",
     })).toMatchObject({ available: false, invalid: ["FACTGRID_CONTRIBUTOR_POLICY"] });
+  });
+
+  it.each(["false", "", "yes", "TRUE"])("keeps editing disabled for the explicit value %j", (value) => {
+    expect(getAuthConfiguration({ ...completeEnvironment, FACTGRID_EDITING_ENABLED: value }))
+      .toMatchObject({ available: true, config: { editingEnabled: false } });
+  });
+
+  it("enables authenticated editing with an explicit true", () => {
+    expect(getAuthConfiguration({ ...completeEnvironment, FACTGRID_EDITING_ENABLED: "true" }))
+      .toMatchObject({ available: true, config: { editingEnabled: true, contributorPolicy: "authenticated" } });
   });
 
   it("requires an explicit boolean before trusting proxy identity headers", () => {

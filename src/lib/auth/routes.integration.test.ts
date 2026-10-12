@@ -643,6 +643,7 @@ describe("authentication route integration", () => {
 
   it("keeps an authenticated but unapproved account denied by the real edit route", async () => {
     setConfiguredEnvironment({ editingEnabled: true, allowedEditors: "AnotherEditor" });
+    vi.stubEnv("FACTGRID_CONTRIBUTOR_POLICY", "restricted");
     const { sessionToken } = await completeLogin();
     const sessionResponse = await session(
       request("/api/session", {
@@ -673,6 +674,22 @@ describe("authentication route integration", () => {
     expect(response.status).toBe(403);
     expect(await response.json()).toMatchObject({
       error: { code: "editor_not_authorized" },
+    });
+  });
+
+  it("reports authenticated editing enabled by default without an editor allowlist", async () => {
+    setConfiguredEnvironment();
+    vi.stubEnv("FACTGRID_EDITING_ENABLED", undefined);
+    vi.stubEnv("FACTGRID_CONTRIBUTOR_POLICY", undefined);
+    const { sessionToken } = await completeLogin();
+    const response = await session(request("/api/session", {
+      headers: { cookie: cookieHeader(SESSION_COOKIE_NAME, sessionToken) },
+    }));
+    expect(await response.json()).toMatchObject({
+      authenticated: true,
+      editingEnabled: true,
+      contributorPolicy: "authenticated",
+      editorApproved: true,
     });
   });
 });

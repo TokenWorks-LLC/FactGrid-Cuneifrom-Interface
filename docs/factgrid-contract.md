@@ -162,12 +162,12 @@ Requests use HMAC-SHA1 signatures; identity uses a verified HS256 JWT from the
 identify endpoint. OAuth 2 authorization code, PKCE, and refresh-token support is
 retained for existing deployments. Identity-only access cannot write through the
 Action API. An approved non-owner-only consumer can be authorized by other
-FactGrid accounts without per-user administrator action. No published cuneiform-
-specific editor policy was found. Consequently,
-editing defaults to disabled. The default `restricted` contributor policy additionally
-requires a deployment-maintained exact username allowlist and exact target allowlist.
-An operator may explicitly select `authenticated` only after project approval; that
-mode omits deployment allowlists while retaining fresh identity, rights, blocks,
+FactGrid accounts without per-user administrator action. Editing now defaults to
+enabled with the `authenticated` contributor policy, following the project's
+decision to support contributions by eligible FactGrid members. The optional
+`restricted` policy requires an exact username allowlist for all writes and an exact
+document-target allowlist for transcription writes, not metadata writes.
+The default mode omits deployment allowlists while retaining fresh identity, rights, blocks,
 reported grants, current catalogue membership/linkage, origin, CSRF, validation,
 conflict, and readback checks.
 

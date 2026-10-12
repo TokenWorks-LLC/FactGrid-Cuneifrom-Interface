@@ -85,7 +85,7 @@ export function getAuthConfiguration(
   if (oauthVersion !== "1.0a" && oauthVersion !== "2.0") {
     invalid.push("FACTGRID_OAUTH_VERSION");
   }
-  const contributorPolicy = env.FACTGRID_CONTRIBUTOR_POLICY?.trim() || "restricted";
+  const contributorPolicy = env.FACTGRID_CONTRIBUTOR_POLICY?.trim() || "authenticated";
   if (contributorPolicy !== "restricted" && contributorPolicy !== "authenticated") {
     invalid.push("FACTGRID_CONTRIBUTOR_POLICY");
   }
@@ -145,7 +145,8 @@ export function getAuthConfiguration(
       sessionDbPath: env.FACTGRID_SESSION_DB_PATH!,
       sessionSecret: env.SESSION_SECRET!,
       secureCookies: production,
-      editingEnabled: env.FACTGRID_EDITING_ENABLED === "true",
+      // An explicit false (or invalid value) still disables every write.
+      editingEnabled: env.FACTGRID_EDITING_ENABLED === undefined || env.FACTGRID_EDITING_ENABLED === "true",
       contributorPolicy: contributorPolicy as "restricted" | "authenticated",
       trustProxy: trustProxyValue === "true",
       allowedEditors: parseAllowedEditors(env.FACTGRID_ALLOWED_EDITORS),
