@@ -15,6 +15,9 @@ describe("bounded FactGrid search contracts", () => {
       collection: "q512014",
       findspot: "Q390036",
       period: "Q512151",
+      language: "q123",
+      workType: "Q456",
+      material: "q789",
       page: 2,
       pageSize: 10,
     });
@@ -24,10 +27,19 @@ describe("bounded FactGrid search contracts", () => {
     expect(expression).toContain("haswbstatement:P329=Q512014");
     expect(expression).toContain("haswbstatement:P695=Q390036");
     expect(expression).toContain("haswbstatement:P853=Q512151");
+    expect(expression).toContain("haswbstatement:P18=Q123");
+    expect(expression).toContain("haswbstatement:P121=Q456");
+    expect(expression).toContain("haswbstatement:P401=Q789");
     expect(expression).toContain('"Prag\\""');
     expect(
       expression.split(/\s+/u).filter((token) => token.startsWith("haswbstatement:P2=")),
     ).toHaveLength(1);
+  });
+
+  it("rejects invalid metadata filters before building a search", () => {
+    for (const filter of ["language", "workType", "material"] as const) {
+      expect(() => normalizeSearchInput({ [filter]: 'Q1" haswbstatement:P2=Q2' })).toThrow(/valid FactGrid QID/i);
+    }
   });
 
   it("uses bounded membership-restricted facets without global counts", () => {

@@ -46,6 +46,7 @@ const labels = {
   Q9000100: "TEST FIXTURE collection",
   Q9000101: "TEST FIXTURE findspot",
   Q9000102: "TEST FIXTURE period",
+  Q9000103: "TEST FIXTURE clay",
   Q512148: "Ur III Period",
   Q21880: "Friedrich-Schiller-University Jena",
 };
@@ -133,6 +134,7 @@ globalThis.fetch = async (input, init) => {
     const allowedExpressions = new Set([
       'haswbstatement:P2=Q512006 "Prag" "I" "437"',
       'haswbstatement:P2=Q512006 haswbstatement:P329=Q9000100 "TEST" "FIXTURE"',
+      'haswbstatement:P2=Q512006 haswbstatement:P401=Q9000103',
       'haswbstatement:P2=Q512006 haswbstatement:P329=Q21880 "Prag" "I" "437"',
       'haswbstatement:P2=Q512006 haswbstatement:P853=Q512148 "Prag" "I" "437"',
     ]);
