@@ -246,6 +246,18 @@ function stopProxy() {
   docker(["rm", "--force", names.proxy], { capture: true, allowFailure: true });
 }
 
+async function navigateSmokePage(page, url) {
+  for (let attempt = 1; attempt <= 3; attempt += 1) {
+    try {
+      return await page.goto(url, { waitUntil: "domcontentloaded" });
+    } catch (error) {
+      if (!String(error).includes("net::ERR_NETWORK_CHANGED") || attempt === 3) throw error;
+      log(`Chromium network changed during navigation; retrying (${attempt}/2)`);
+      await sleep(500 * attempt);
+    }
+  }
+}
+
 async function verifyUnavailableUi(appPort) {
   const { chromium } = await import("playwright");
   const browser = await chromium.launch();
@@ -256,9 +268,7 @@ async function verifyUnavailableUi(appPort) {
         ignoreHTTPSErrors: true,
         viewport: { width: 1280, height: 800 },
       });
-      const response = await page.goto(`https://127.0.0.1:${appPort}${route}`, {
-        waitUntil: "domcontentloaded",
-      });
+      const response = await navigateSmokePage(page, `https://127.0.0.1:${appPort}${route}`);
       assert.equal(response?.status(), 200, `Expected ${route} to return 200.`);
       const navigation = page.getByRole("navigation", { name: "Primary", exact: true });
       const login = navigation.getByRole("link", { name: "Log in with FactGrid", exact: true });
@@ -272,7 +282,7 @@ async function verifyUnavailableUi(appPort) {
       ignoreHTTPSErrors: true,
       viewport: { width: 390, height: 844 },
     });
-    await page.goto(`https://127.0.0.1:${appPort}/`, { waitUntil: "domcontentloaded" });
+    await navigateSmokePage(page, `https://127.0.0.1:${appPort}/`);
     const navigation = page.getByRole("navigation", { name: "Primary", exact: true });
     const login = navigation.getByRole("link", { name: "Log in with FactGrid", exact: true });
     await login.focus();
