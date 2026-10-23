@@ -18,7 +18,7 @@ export const metadata: Metadata = {
 export const dynamic = "force-dynamic";
 
 type BrowseSearchParams = Promise<
-  Record<"q" | "collection" | "findspot" | "period" | "page", string | string[] | undefined>
+  Record<"q" | "collection" | "findspot" | "period" | "language" | "workType" | "material" | "page", string | string[] | undefined>
 >;
 
 function first(value: string | string[] | undefined): string {
@@ -37,7 +37,7 @@ function pageUrl(values: Record<string, string>, page: number): string {
 
 function contextualFacetOptions(
   results: TabletSearchPage["results"],
-  property: "holdings" | "findspots" | "periods",
+  property: "holdings" | "findspots" | "periods" | "languages" | "workTypes" | "materials",
   selected: string,
 ): LabeledEntity[] {
   const options = new Map<string, LabeledEntity>();
@@ -65,6 +65,9 @@ export default async function BrowsePage({ searchParams }: { searchParams: Brows
     collection: first(raw.collection).trim(),
     findspot: first(raw.findspot).trim(),
     period: first(raw.period).trim(),
+    language: first(raw.language).trim(),
+    workType: first(raw.workType).trim(),
+    material: first(raw.material).trim(),
   };
   const pageValue = Number.parseInt(first(raw.page) || "1", 10);
   const page = Number.isSafeInteger(pageValue) ? Math.min(100, Math.max(1, pageValue)) : 1;
@@ -74,15 +77,21 @@ export default async function BrowsePage({ searchParams }: { searchParams: Brows
     collection: values.collection || undefined,
     findspot: values.findspot || undefined,
     period: values.period || undefined,
+    language: values.language || undefined,
+    workType: values.workType || undefined,
+    material: values.material || undefined,
     page,
   });
   const facets = {
     collections: contextualFacetOptions(results.results, "holdings", values.collection),
     findspots: contextualFacetOptions(results.results, "findspots", values.findspot),
     periods: contextualFacetOptions(results.results, "periods", values.period),
+    languages: contextualFacetOptions(results.results, "languages", values.language),
+    workTypes: contextualFacetOptions(results.results, "workTypes", values.workType),
+    materials: contextualFacetOptions(results.results, "materials", values.material),
   };
 
-  const hasFilters = Boolean(values.q || values.collection || values.findspot || values.period);
+  const hasFilters = Object.values(values).some(Boolean);
 
   return (
     <main id="main-content" className="site-container py-12 sm:py-16">
@@ -138,6 +147,30 @@ export default async function BrowsePage({ searchParams }: { searchParams: Brows
                 name="period"
                 options={facets.periods}
                 value={values.period}
+              />
+              <FacetSelect
+                key={`language-${values.language}`}
+                label="Language"
+                searchLabel="Find more languages by name"
+                name="language"
+                options={facets.languages}
+                value={values.language}
+              />
+              <FacetSelect
+                key={`workType-${values.workType}`}
+                label="Type of work"
+                searchLabel="Find more types of work by name"
+                name="workType"
+                options={facets.workTypes}
+                value={values.workType}
+              />
+              <FacetSelect
+                key={`material-${values.material}`}
+                label="Material"
+                searchLabel="Find more materials by name"
+                name="material"
+                options={facets.materials}
+                value={values.material}
               />
               <p className="text-xs leading-5 text-muted-foreground">
                 Choices from this results page appear first. Search FactGrid by name for more;

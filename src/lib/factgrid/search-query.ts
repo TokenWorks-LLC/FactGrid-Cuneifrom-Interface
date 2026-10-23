@@ -28,6 +28,15 @@ export function buildCirrusSearchExpression(input: NormalizedSearchInput): strin
   if (input.period) {
     clauses.push(`haswbstatement:${FACTGRID_PROPERTIES.period}=${input.period}`);
   }
+  if (input.language) {
+    clauses.push(`haswbstatement:${FACTGRID_PROPERTIES.language}=${input.language}`);
+  }
+  if (input.workType) {
+    clauses.push(`haswbstatement:${FACTGRID_PROPERTIES.workType}=${input.workType}`);
+  }
+  if (input.material) {
+    clauses.push(`haswbstatement:${FACTGRID_PROPERTIES.material}=${input.material}`);
+  }
   if (input.q) {
     // Quoting whitespace-delimited tokens retains useful identifier/name search
     // while preventing haswbstatement, namespace, wildcard, or regex injection.

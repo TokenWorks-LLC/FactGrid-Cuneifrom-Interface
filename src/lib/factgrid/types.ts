@@ -6,6 +6,9 @@ export interface SearchInput {
   collection?: string;
   findspot?: string;
   period?: string;
+  language?: string;
+  workType?: string;
+  material?: string;
   page?: number;
   pageSize?: number;
 }
@@ -15,6 +18,9 @@ export interface NormalizedSearchInput {
   collection?: Qid;
   findspot?: Qid;
   period?: Qid;
+  language?: Qid;
+  workType?: Qid;
+  material?: Qid;
   page: number;
   pageSize: number;
 }
@@ -136,6 +142,9 @@ export type TabletSearchResult = Pick<
   | "holdings"
   | "findspots"
   | "periods"
+  | "languages"
+  | "workTypes"
+  | "materials"
 >;
 
 export interface TabletSearchPage {
