@@ -154,8 +154,9 @@ unknown and accepted-unconfirmed outcomes retain it.
 
 React escapes record strings and transcript previews. Wikitext display is reduced to
 sanitized plain text; raw MediaWiki HTML is never injected. External URLs are
-scheme-validated and rendered as outbound links. Record images remain links unless
-item-specific reuse rights are known.
+scheme-validated. Record images are loaded from external hosts only after a visitor
+selects one in the zoom viewer; the original source link and rights notice remain
+visible. IIIF manifests are read in the browser when their hosts permit CORS.
 
 ## Simplicity review — 29 September 2026
 

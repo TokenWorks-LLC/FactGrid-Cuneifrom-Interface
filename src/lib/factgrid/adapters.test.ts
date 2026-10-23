@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 
-import { adaptTabletEntity } from "./adapters";
+import { adaptTabletEntity, collectReferencedQids } from "./adapters";
 import { resolveFactGridDocumentUrl } from "./documents";
 import {
   analyzeTranscriptSource,
@@ -74,6 +74,41 @@ describe("FactGrid entity adapters", () => {
     };
 
     expect(adaptTabletEntity(entity).inventoryNumbers).toEqual(["I 437"]);
+  });
+
+  it("keeps object side and media type qualifiers with their own image", () => {
+    const response = entityFixture("entity-multiple-editions.json");
+    const entity = response.entities!.Q9000002;
+    entity.claims!.P188 = [
+      {
+        rank: "normal",
+        mainsnak: { snaktype: "value", datavalue: { value: "https://example.org/top.jpg" } },
+        qualifiers: {
+          P1029: [{ snaktype: "value", datavalue: { value: { id: "Q743328" } } }],
+          P15: [{ snaktype: "value", datavalue: { value: { id: "Q893157" } } }],
+        },
+      },
+      {
+        rank: "normal",
+        mainsnak: { snaktype: "value", datavalue: { value: "https://example.org/back.jpg" } },
+        qualifiers: { P1029: [{ snaktype: "value", datavalue: { value: { id: "Q743329" } } }] },
+      },
+      {
+        rank: "normal",
+        mainsnak: { snaktype: "value", datavalue: { value: "javascript:alert(1)" } },
+      },
+    ];
+
+    expect(collectReferencedQids(entity)).toContain("Q743328");
+    expect(collectReferencedQids(entity)).toContain("Q893157");
+    expect(adaptTabletEntity(entity, {
+      Q743328: "Top",
+      Q743329: "Back",
+      Q893157: "3D rendering",
+    }).images).toEqual([
+      expect.objectContaining({ url: "https://example.org/top.jpg", sides: [expect.objectContaining({ label: "Top" })], mediaTypes: [expect.objectContaining({ label: "3D rendering" })] }),
+      expect.objectContaining({ url: "https://example.org/back.jpg", sides: [expect.objectContaining({ label: "Back" })], mediaTypes: [] }),
+    ]);
   });
 
   it("preserves a bounded provider-owned lower-case statement GUID", () => {

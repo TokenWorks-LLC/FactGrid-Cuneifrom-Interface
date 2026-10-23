@@ -5,6 +5,14 @@ const fixtureRoot = join(process.cwd(), "tests", "fixtures", "factgrid");
 const tablet = JSON.parse(
   readFileSync(join(fixtureRoot, "entity-multiple-editions.json"), "utf8"),
 ).response.entities.Q9000002;
+tablet.claims.P188 = [{
+  rank: "normal",
+  mainsnak: { snaktype: "value", property: "P188", datavalue: { value: "https://images.example.test/iiif/3/Q9000002" } },
+  qualifiers: {
+    P1029: [{ snaktype: "value", datavalue: { value: { id: "Q743328" } } }],
+    P15: [{ snaktype: "value", datavalue: { value: { id: "Q893157" } } }],
+  },
+}];
 const sparseTablet = JSON.parse(
   readFileSync(join(fixtureRoot, "entity-sparse-no-transcript.json"), "utf8"),
 ).response.entities.Q9000001;
@@ -25,6 +33,8 @@ const revisions = JSON.parse(
 const originalFetch = globalThis.fetch.bind(globalThis);
 
 const labels = {
+  Q743328: "Top",
+  Q893157: "3D rendering",
   Q102135: "centimetre",
   Q512006: "cuneiform tablet catalogue",
   Q9000100: "TEST FIXTURE collection",

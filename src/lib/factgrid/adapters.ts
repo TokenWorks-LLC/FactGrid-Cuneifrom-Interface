@@ -13,6 +13,7 @@ import type {
   MediaWikiPage,
   Qid,
   SourceLink,
+  TabletImage,
   TabletEdition,
   TabletRecord,
   WikibaseEntity,
@@ -108,6 +109,16 @@ function entityQids(entity: WikibaseEntity, property: string): Qid[] {
   return [...seen];
 }
 
+function qualifierEntityQids(statement: WikibaseStatement, property: string, labels: LabelMap): LabeledEntity[] {
+  const seen = new Set<Qid>();
+  for (const snak of statement.qualifiers?.[property] ?? []) {
+    if (snak.snaktype !== "value") continue;
+    const qid = qidFromUnknown(snak.datavalue?.value);
+    if (qid) seen.add(qid);
+  }
+  return [...seen].map((qid) => labeledEntity(qid, labels));
+}
+
 function labeledEntity(id: Qid, labels: LabelMap): LabeledEntity {
   return {
     id,
@@ -133,16 +144,24 @@ function safePublicUrl(value: string): string | undefined {
   }
 }
 
-function sourceLinks(entity: WikibaseEntity): {
-  images: SourceLink[];
+function sourceLinks(entity: WikibaseEntity, labels: LabelMap): {
+  images: TabletImage[];
   externalTranscripts: SourceLink[];
 } {
-  const images: SourceLink[] = [];
+  const images: TabletImage[] = [];
   const externalTranscripts: SourceLink[] = [];
 
-  for (const rawUrl of stringValues(entity, FACTGRID_PROPERTIES.onlineImage)) {
+  for (const statement of activeStatements(entity, FACTGRID_PROPERTIES.onlineImage)) {
+    const rawUrl = statementStringValue(statement);
+    if (!rawUrl) continue;
     const url = safePublicUrl(rawUrl);
-    if (url) images.push({ kind: "online-image", label: "Online image", url });
+    if (url) images.push({
+      kind: "online-image",
+      label: "Online image",
+      url,
+      sides: qualifierEntityQids(statement, FACTGRID_PROPERTIES.imageSide, labels),
+      mediaTypes: qualifierEntityQids(statement, FACTGRID_PROPERTIES.mediaType, labels),
+    });
   }
 
   for (const filename of stringValues(entity, FACTGRID_PROPERTIES.commonsImage)) {
@@ -151,6 +170,8 @@ function sourceLinks(entity: WikibaseEntity): {
         kind: "commons-image",
         label: `Wikimedia Commons: ${filename}`,
         url: `https://commons.wikimedia.org/wiki/Special:Redirect/file/${encodeURIComponent(filename)}`,
+        sides: [],
+        mediaTypes: [],
       });
     }
   }
@@ -168,7 +189,7 @@ function sourceLinks(entity: WikibaseEntity): {
   }
 
   return {
-    images: dedupeLinks(images),
+    images,
     externalTranscripts: dedupeLinks(externalTranscripts),
   };
 }
@@ -226,6 +247,15 @@ export function collectReferencedQids(entity: WikibaseEntity): Qid[] {
   for (const property of properties) {
     for (const qid of entityQids(entity, property)) result.add(qid);
   }
+  for (const statement of activeStatements(entity, FACTGRID_PROPERTIES.onlineImage)) {
+    for (const property of [FACTGRID_PROPERTIES.imageSide, FACTGRID_PROPERTIES.mediaType]) {
+      for (const snak of statement.qualifiers?.[property] ?? []) {
+        if (snak.snaktype !== "value") continue;
+        const qid = qidFromUnknown(snak.datavalue?.value);
+        if (qid) result.add(qid);
+      }
+    }
+  }
   for (const property of Object.values(FACTGRID_PROPERTIES.dimensions)) {
     for (const value of statementValues(entity, property)) {
       if (!value || typeof value !== "object") continue;
@@ -252,7 +282,7 @@ export function adaptTabletEntity(entity: WikibaseEntity, labels: LabelMap = {})
   const rawTitle = stringValues(entity, FACTGRID_PROPERTIES.title)[0];
   const title = rawTitle ?? bestTerm(entity.labels) ?? qid;
   const description = bestTerm(entity.descriptions);
-  const sources = sourceLinks(entity);
+  const sources = sourceLinks(entity, labels);
   const holdingStatements = activeStatements(entity, FACTGRID_PROPERTIES.presentHolding);
   const documentStatements = activeStatements(entity, FACTGRID_PROPERTIES.documentPage).filter(
     (statement) => statementStringValue(statement) !== undefined,

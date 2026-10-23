@@ -47,10 +47,9 @@ export default function AboutPage() {
           <h2>Images and rights</h2>
           <p>
             FactGrid&apos;s structured data is published under CC0. Linked images
-            and transcript publications can have different rights. This interface
-            only embeds an image when usable rights and attribution are available;
-            otherwise it provides a source link and leaves rights assessment to the
-            source record.
+            and transcript publications can have different rights. Images load from
+            their source only when you choose to view one. The source link remains
+            available, and viewing an image does not grant permission to reuse it.
           </p>
 
           <h2 className="scroll-mt-24" id="sign-in-availability">FactGrid sign-in</h2>

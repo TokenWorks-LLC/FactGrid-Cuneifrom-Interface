@@ -170,3 +170,34 @@ test("plain Transcript-section poems remain readable", async ({ page }) => {
     await page.locator("html").evaluate((element) => element.scrollWidth <= element.clientWidth),
   ).toBe(true);
 });
+
+test("image viewer loads a IIIF manifest on demand and shows image qualifiers", async ({ page }) => {
+  let externalRequests = 0;
+  const png = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVQIHWP4z8DwHwAFgAI/ScL/nwAAAABJRU5ErkJggg==", "base64");
+  await page.route("https://images.example.test/**", async (route) => {
+    externalRequests += 1;
+    if (route.request().url().endsWith("/iiif/3/Q9000002")) {
+      await route.fulfill({
+        contentType: "application/json",
+        headers: { "Access-Control-Allow-Origin": "*" },
+        body: JSON.stringify({
+          type: "Manifest",
+          items: [{ label: { en: ["Front"] }, items: [{ items: [{ motivation: "painting", body: { id: "https://images.example.test/front.png" } }] }] }],
+        }),
+      });
+    } else {
+      await route.fulfill({ contentType: "image/png", body: png });
+    }
+  });
+
+  await page.goto("/tablets/Q9000002");
+  await expect(page.getByRole("heading", { name: "Images" })).toBeVisible();
+  expect(externalRequests).toBe(0);
+  await page.getByRole("button", { name: /Image 1 Top · 3D rendering/ }).click();
+  await expect(page.getByText("Object side: Top")).toBeVisible();
+  await expect(page.getByText("Media type: 3D rendering")).toBeVisible();
+  await expect(page.getByRole("link", { name: "Open source" })).toHaveAttribute("href", "https://images.example.test/iiif/3/Q9000002");
+  await expect.poll(() => externalRequests).toBeGreaterThan(1);
+  await expect(page.getByText("Loading image…")).toBeHidden();
+  await expect(page.locator('[aria-label="Image 1 zoom viewer"] canvas').first()).toBeVisible();
+});

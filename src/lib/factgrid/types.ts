@@ -97,6 +97,14 @@ export interface SourceLink {
   url: string;
 }
 
+export interface TabletImage {
+  kind: "online-image" | "commons-image";
+  label: string;
+  url: string;
+  sides: LabeledEntity[];
+  mediaTypes: LabeledEntity[];
+}
+
 export interface TabletRecord {
   qid: Qid;
   title: string;
@@ -113,7 +121,7 @@ export interface TabletRecord {
   workTypes: LabeledEntity[];
   materials: LabeledEntity[];
   dimensions: DimensionValue[];
-  images: SourceLink[];
+  images: TabletImage[];
   externalTranscripts: SourceLink[];
   editions: TabletEdition[];
   omittedEditionCount: number;
