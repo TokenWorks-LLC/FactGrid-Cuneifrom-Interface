@@ -90,6 +90,13 @@ const tabletPropertySuggestions = [
   { id: FACTGRID_PROPERTIES.surfaceArea, label: "Surface area" },
   { id: FACTGRID_PROPERTIES.external3dModel, label: "External 3D model" },
   { id: FACTGRID_PROPERTIES.wikidataId, label: "Wikidata item" },
+  { id: FACTGRID_PROPERTIES.publishedIn, label: "Published in" },
+  { id: FACTGRID_PROPERTIES.author, label: "Author" },
+  { id: FACTGRID_PROPERTIES.addressee, label: "Addressed to" },
+  { id: FACTGRID_PROPERTIES.containsDocumentsOf, label: "Contains documents of" },
+  { id: FACTGRID_PROPERTIES.personMentioned, label: "Person mentioned" },
+  { id: FACTGRID_PROPERTIES.oareId, label: "OARE ID" },
+  { id: FACTGRID_PROPERTIES.onlineInformation, label: "Online information" },
 ];
 
 function cloneEntity(entity: EditableEntity): EditableEntity {

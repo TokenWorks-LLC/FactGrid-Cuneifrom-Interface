@@ -139,11 +139,13 @@ function sourceLinks(entity: WikibaseEntity): {
   externalTranscripts: SourceLink[];
   onlineDigitizations: SourceLink[];
   external3dModels: SourceLink[];
+  onlineInformation: SourceLink[];
 } {
   const images: SourceLink[] = [];
   const externalTranscripts: SourceLink[] = [];
   const onlineDigitizations: SourceLink[] = [];
   const external3dModels: SourceLink[] = [];
+  const onlineInformation: SourceLink[] = [];
 
   for (const rawUrl of stringValues(entity, FACTGRID_PROPERTIES.onlineImage)) {
     const url = safePublicUrl(rawUrl);
@@ -182,15 +184,21 @@ function sourceLinks(entity: WikibaseEntity): {
     if (url) external3dModels.push({ kind: "external-3d-model", label: new URL(url).hostname, url });
   }
 
+  for (const rawUrl of stringValues(entity, FACTGRID_PROPERTIES.onlineInformation)) {
+    const url = safePublicUrl(rawUrl);
+    if (url) onlineInformation.push({ kind: "online-information", label: new URL(url).hostname, url });
+  }
+
   return {
     images: dedupeLinks(images),
     externalTranscripts: dedupeLinks(externalTranscripts),
     onlineDigitizations: dedupeLinks(onlineDigitizations),
     external3dModels: dedupeLinks(external3dModels),
+    onlineInformation: dedupeLinks(onlineInformation),
   };
 }
 
-function identifierLinks(entity: WikibaseEntity): { dois: SourceLink[]; wikidataItems: SourceLink[] } {
+function identifierLinks(entity: WikibaseEntity): { dois: SourceLink[]; wikidataItems: SourceLink[]; oareIds: SourceLink[] } {
   const dois = stringValues(entity, FACTGRID_PROPERTIES.doi).flatMap((raw): SourceLink[] => {
     const doi = raw.trim();
     return /^10\.\d{4,9}\/\S+$/iu.test(doi) && doi.length <= 255
@@ -207,7 +215,13 @@ function identifierLinks(entity: WikibaseEntity): { dois: SourceLink[]; wikidata
       ? [{ kind: "wikidata-item", label: id, url: `https://www.wikidata.org/wiki/${id}` }]
       : [];
   });
-  return { dois: dedupeLinks(dois), wikidataItems: dedupeLinks(wikidataItems) };
+  const oareIds = stringValues(entity, FACTGRID_PROPERTIES.oareId).flatMap((raw): SourceLink[] => {
+    const id = raw.trim();
+    return /^[A-Za-z0-9][A-Za-z0-9._-]{0,99}$/u.test(id)
+      ? [{ kind: "oare-id", label: id, url: `https://oare.byu.edu/epigraphies/${encodeURIComponent(id)}` }]
+      : [];
+  });
+  return { dois: dedupeLinks(dois), wikidataItems: dedupeLinks(wikidataItems), oareIds: dedupeLinks(oareIds) };
 }
 
 function dedupeLinks(links: SourceLink[]): SourceLink[] {
@@ -258,6 +272,10 @@ export function collectReferencedQids(entity: WikibaseEntity): Qid[] {
     FACTGRID_PROPERTIES.language,
     FACTGRID_PROPERTIES.workType,
     FACTGRID_PROPERTIES.material,
+    FACTGRID_PROPERTIES.publishedIn,
+    FACTGRID_PROPERTIES.author,
+    FACTGRID_PROPERTIES.addressee,
+    FACTGRID_PROPERTIES.containsDocumentsOf,
   ];
   const result = new Set<Qid>();
   for (const property of properties) {
@@ -279,6 +297,7 @@ export function collectReferencedQids(entity: WikibaseEntity): Qid[] {
       }
     }
   }
+  for (const qid of entityQids(entity, FACTGRID_PROPERTIES.personMentioned)) result.add(qid);
   return [...result];
 }
 
@@ -333,6 +352,7 @@ export function adaptTabletEntity(entity: WikibaseEntity, labels: LabelMap = {})
     revisionId: entity.lastrevid,
     modified: entity.modified,
     cdliIds: [...new Set(stringValues(entity, FACTGRID_PROPERTIES.cdliId))],
+    oareIds: identifiers.oareIds,
     dois: identifiers.dois,
     wikidataItems: identifiers.wikidataItems,
     inventoryNumbers: [
@@ -341,6 +361,11 @@ export function adaptTabletEntity(entity: WikibaseEntity, labels: LabelMap = {})
       ),
     ],
     holdings: toLabels(FACTGRID_PROPERTIES.presentHolding),
+    publications: toLabels(FACTGRID_PROPERTIES.publishedIn),
+    authors: toLabels(FACTGRID_PROPERTIES.author),
+    addressees: toLabels(FACTGRID_PROPERTIES.addressee),
+    documentGroups: toLabels(FACTGRID_PROPERTIES.containsDocumentsOf),
+    mentionedPeople: toLabels(FACTGRID_PROPERTIES.personMentioned),
     findspots: toLabels(FACTGRID_PROPERTIES.findspot),
     periods: toLabels(FACTGRID_PROPERTIES.period),
     languages: toLabels(FACTGRID_PROPERTIES.language),
@@ -351,6 +376,7 @@ export function adaptTabletEntity(entity: WikibaseEntity, labels: LabelMap = {})
     volumes: quantities(entity, FACTGRID_PROPERTIES.volume, labels),
     images: sources.images,
     onlineDigitizations: sources.onlineDigitizations,
+    onlineInformation: sources.onlineInformation,
     external3dModels: sources.external3dModels,
     externalTranscripts: sources.externalTranscripts,
     editions,

@@ -110,14 +110,20 @@ export default async function TabletPage({ params }: TabletPageProps) {
             <MetadataRow label="FactGrid ID" values={[tablet.qid]} mono />
             <MetadataRow label="Inventory number" values={tablet.inventoryNumbers} />
             <MetadataRow label="CDLI ID" values={tablet.cdliIds} mono />
+            <MetadataLinks label="OARE ID" values={tablet.oareIds} />
             <MetadataLinks label="DOI" values={tablet.dois} />
             <MetadataLinks label="Wikidata" values={tablet.wikidataItems} />
             <MetadataEntities label="Collection / holding" values={tablet.holdings} />
+            <MetadataEntities label="Published in" values={tablet.publications} />
             <MetadataEntities label="Finding spot" values={tablet.findspots} />
             <MetadataEntities label="Period / style" values={tablet.periods} />
             <MetadataEntities label="Language" values={tablet.languages} />
             <MetadataEntities label="Type of work" values={tablet.workTypes} />
             <MetadataEntities label="Material" values={tablet.materials} />
+            <MetadataEntities label="Author" values={tablet.authors} />
+            <MetadataEntities label="Addressed to" values={tablet.addressees} />
+            <MetadataEntities label="Contains documents of" values={tablet.documentGroups} />
+            <MetadataEntities label="People mentioned" values={tablet.mentionedPeople} />
             <MetadataRow
               label="Dimensions"
               values={tablet.dimensions.map(
@@ -128,6 +134,7 @@ export default async function TabletPage({ params }: TabletPageProps) {
             <MetadataQuantities label="Surface area" values={tablet.surfaceAreas} />
             <MetadataQuantities label="Volume" values={tablet.volumes} />
             <MetadataLinks label="Online digitization" values={tablet.onlineDigitizations} />
+            <MetadataLinks label="Online information" values={tablet.onlineInformation} />
             <MetadataLinks label="External 3D model" values={tablet.external3dModels} />
           </dl>
 
