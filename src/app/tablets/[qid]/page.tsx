@@ -10,7 +10,7 @@ import { TabletModelViewer } from "@/components/tablet-model-viewer";
 import { UnicodeText } from "@/components/unicode-text";
 import { Badge } from "@/components/ui/badge";
 import { isEditTargetEnabled, parseAllowedEditTargets } from "@/lib/edit/targets";
-import { FactGridNotFoundError, type LabeledEntity, type TabletEdition } from "@/lib/factgrid";
+import { FactGridNotFoundError, type LabeledEntity, type QuantityValue, type SourceLink, type TabletEdition } from "@/lib/factgrid";
 import { getTablet } from "@/lib/factgrid/server";
 import { wikitextToPlainText } from "@/lib/wikitext-display";
 
@@ -113,12 +113,20 @@ export default async function TabletPage({ params }: TabletPageProps) {
             <MetadataRow label="FactGrid ID" values={[tablet.qid]} mono />
             <MetadataRow label="Inventory number" values={tablet.inventoryNumbers} />
             <MetadataRow label="CDLI ID" values={tablet.cdliIds} mono />
+            <MetadataLinks label="OARE ID" values={tablet.oareIds} />
+            <MetadataLinks label="DOI" values={tablet.dois} />
+            <MetadataLinks label="Wikidata" values={tablet.wikidataItems} />
             <MetadataEntities label="Collection / holding" filter="collection" values={tablet.holdings} />
+            <MetadataEntities label="Published in" values={tablet.publications} />
             <MetadataEntities label="Finding spot" filter="findspot" values={tablet.findspots} />
             <MetadataEntities label="Period / style" filter="period" values={tablet.periods} />
             <MetadataEntities label="Language" filter="language" values={tablet.languages} />
             <MetadataEntities label="Type of work" filter="workType" values={tablet.workTypes} />
             <MetadataEntities label="Material" filter="material" values={tablet.materials} />
+            <MetadataEntities label="Author" values={tablet.authors} />
+            <MetadataEntities label="Addressed to" values={tablet.addressees} />
+            <MetadataEntities label="Contains documents of" values={tablet.documentGroups} />
+            <MetadataEntities label="People mentioned" values={tablet.mentionedPeople} />
             <MetadataRow
               label="Dimensions"
               values={tablet.dimensions.map(
@@ -126,6 +134,11 @@ export default async function TabletPage({ params }: TabletPageProps) {
                   `${dimension.kind}: ${dimension.amount}${dimension.unit ? ` ${dimension.unit.label}` : ""}`,
               )}
             />
+            <MetadataQuantities label="Surface area" values={tablet.surfaceAreas} />
+            <MetadataQuantities label="Volume" values={tablet.volumes} />
+            <MetadataLinks label="Online digitization" values={tablet.onlineDigitizations} />
+            <MetadataLinks label="Online information" values={tablet.onlineInformation} />
+            <MetadataLinks label="External 3D model" values={tablet.external3dModels} />
           </dl>
 
           <div className="mt-9">
@@ -294,7 +307,7 @@ function MetadataEntities({
   values,
 }: {
   label: string;
-  filter: "collection" | "findspot" | "period" | "language" | "workType" | "material";
+  filter?: "collection" | "findspot" | "period" | "language" | "workType" | "material";
   values: LabeledEntity[];
 }) {
   return (
@@ -303,17 +316,47 @@ function MetadataEntities({
       <dd className="mt-1 text-sm">
         {values.length > 0
           ? values.map((value, index) => (
-              <span className="inline-flex flex-wrap items-center gap-x-1" key={value.id}>
+              <span className={filter ? "inline-flex flex-wrap items-center gap-x-1" : undefined} key={value.id}>
                 {index > 0 ? ", " : null}
-                <Link className="focus-ring underline decoration-border underline-offset-4 hover:decoration-primary" href={`/browse?${filter}=${value.id}`}>
-                  {value.label}
-                </Link>
-                <a aria-label={`View ${value.label} in FactGrid`} className="focus-ring inline-flex min-h-8 items-center text-muted-foreground hover:text-foreground" href={value.url} rel="noreferrer" target="_blank" title={`View ${value.label} in FactGrid`}>
-                  <ExternalLink aria-hidden="true" className="size-3.5" />
-                </a>
+                {filter ? (
+                  <>
+                    <Link className="focus-ring underline decoration-border underline-offset-4 hover:decoration-primary" href={`/browse?${filter}=${value.id}`}>
+                      {value.label}
+                    </Link>
+                    <a aria-label={`View ${value.label} in FactGrid`} className="focus-ring inline-flex min-h-8 items-center text-muted-foreground hover:text-foreground" href={value.url} rel="noreferrer" target="_blank" title={`View ${value.label} in FactGrid`}>
+                      <ExternalLink aria-hidden="true" className="size-3.5" />
+                    </a>
+                  </>
+                ) : (
+                  <a className="focus-ring underline decoration-border underline-offset-4 hover:decoration-primary" href={value.url} rel="noreferrer" target="_blank">
+                    {value.label}
+                  </a>
+                )}
               </span>
             ))
           : "Not recorded in FactGrid"}
+      </dd>
+    </div>
+  );
+}
+
+function MetadataQuantities({ label, values }: { label: string; values: QuantityValue[] }) {
+  return <MetadataRow label={label} values={values.map((value) =>
+    `${value.amount}${value.unit ? ` ${value.unit.label}` : ""}`
+  )} />;
+}
+
+function MetadataLinks({ label, values }: { label: string; values: SourceLink[] }) {
+  return (
+    <div className="py-3.5">
+      <dt className="text-xs font-medium text-muted-foreground">{label}</dt>
+      <dd className="mt-1 break-words text-sm">
+        {values.length > 0 ? values.map((value, index) => (
+          <span key={value.url}>
+            {index > 0 ? ", " : null}
+            <a className="focus-ring underline decoration-border underline-offset-4 hover:decoration-primary" href={value.url} rel="noreferrer" target="_blank">{value.label}</a>
+          </span>
+        )) : "Not recorded in FactGrid"}
       </dd>
     </div>
   );

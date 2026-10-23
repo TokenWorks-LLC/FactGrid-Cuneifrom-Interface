@@ -223,6 +223,8 @@ test("tablet model loads only on request and offers a reset control", async ({ p
 
   await page.goto("/tablets/Q9000001");
   await expect(page.getByRole("heading", { name: "3D models" })).toBeVisible();
+  await expect(page.getByText("External 3D model", { exact: true }).locator("..").getByRole("link"))
+    .toHaveAttribute("href", "https://heidicon.ub.uni-heidelberg.de/eas/fixture/tablet.ply");
   expect(modelRequests).toBe(0);
   await page.getByRole("button", { name: "Load interactive 3D model" }).click();
   await expect(page.getByRole("button", { name: "Reset view" })).toBeVisible();

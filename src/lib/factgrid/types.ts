@@ -90,15 +90,18 @@ export interface TabletEdition {
   reason?: string;
 }
 
-export interface DimensionValue {
-  kind: "height" | "width" | "depth";
+export interface QuantityValue {
   property: PropertyId;
   amount: string;
   unit?: LabeledEntity;
 }
 
+export interface DimensionValue extends QuantityValue {
+  kind: "height" | "width" | "depth";
+}
+
 export interface SourceLink {
-  kind: "online-image" | "commons-image" | "external-transcript";
+  kind: "online-image" | "commons-image" | "external-transcript" | "online-digitization" | "external-3d-model" | "online-information" | "doi" | "wikidata-item" | "oare-id";
   label: string;
   url: string;
 }
@@ -116,16 +119,29 @@ export interface TabletRecord {
   revisionId?: number;
   modified?: string;
   cdliIds: string[];
+  oareIds: SourceLink[];
+  dois: SourceLink[];
+  wikidataItems: SourceLink[];
   inventoryNumbers: string[];
   holdings: LabeledEntity[];
+  publications: LabeledEntity[];
+  authors: LabeledEntity[];
+  addressees: LabeledEntity[];
+  documentGroups: LabeledEntity[];
+  mentionedPeople: LabeledEntity[];
   findspots: LabeledEntity[];
   periods: LabeledEntity[];
   languages: LabeledEntity[];
   workTypes: LabeledEntity[];
   materials: LabeledEntity[];
   dimensions: DimensionValue[];
+  surfaceAreas: QuantityValue[];
+  volumes: QuantityValue[];
   images: SourceLink[];
   models: ModelSource[];
+  onlineDigitizations: SourceLink[];
+  onlineInformation: SourceLink[];
+  external3dModels: SourceLink[];
   externalTranscripts: SourceLink[];
   editions: TabletEdition[];
   omittedEditionCount: number;

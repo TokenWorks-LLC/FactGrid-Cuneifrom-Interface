@@ -13,6 +13,7 @@ import type {
   MediaWikiPage,
   ModelSource,
   Qid,
+  QuantityValue,
   SourceLink,
   TabletEdition,
   TabletRecord,
@@ -138,10 +139,16 @@ function sourceLinks(entity: WikibaseEntity): {
   images: SourceLink[];
   models: ModelSource[];
   externalTranscripts: SourceLink[];
+  onlineDigitizations: SourceLink[];
+  external3dModels: SourceLink[];
+  onlineInformation: SourceLink[];
 } {
   const images: SourceLink[] = [];
   const models: ModelSource[] = [];
   const externalTranscripts: SourceLink[] = [];
+  const onlineDigitizations: SourceLink[] = [];
+  const external3dModels: SourceLink[] = [];
+  const onlineInformation: SourceLink[] = [];
 
   for (const rawUrl of stringValues(entity, FACTGRID_PROPERTIES.onlineImage)) {
     const url = safePublicUrl(rawUrl);
@@ -158,10 +165,28 @@ function sourceLinks(entity: WikibaseEntity): {
     }
   }
 
-  for (const rawUrl of stringValues(entity, FACTGRID_PROPERTIES.externalModel)) {
+  // P69 is always a link. It is never fetched, imported, or treated as editable.
+  for (const rawUrl of stringValues(entity, FACTGRID_PROPERTIES.onlineTranscript)) {
+    const url = safePublicUrl(rawUrl);
+    if (url) {
+      externalTranscripts.push({
+        kind: "external-transcript",
+        label: new URL(url).hostname,
+        url,
+      });
+    }
+  }
+
+  for (const rawUrl of stringValues(entity, FACTGRID_PROPERTIES.onlineDigitization)) {
+    const url = safePublicUrl(rawUrl);
+    if (url) onlineDigitizations.push({ kind: "online-digitization", label: new URL(url).hostname, url });
+  }
+
+  for (const rawUrl of stringValues(entity, FACTGRID_PROPERTIES.external3dModel)) {
     const url = safePublicUrl(rawUrl);
     if (!url) continue;
     const parsed = new URL(url);
+    external3dModels.push({ kind: "external-3d-model", label: parsed.hostname, url });
     models.push({
       url,
       // The Heidelberg PLY collection is confirmed to support browser CORS.
@@ -175,23 +200,45 @@ function sourceLinks(entity: WikibaseEntity): {
     });
   }
 
-  // P69 is always a link. It is never fetched, imported, or treated as editable.
-  for (const rawUrl of stringValues(entity, FACTGRID_PROPERTIES.onlineTranscript)) {
+  for (const rawUrl of stringValues(entity, FACTGRID_PROPERTIES.onlineInformation)) {
     const url = safePublicUrl(rawUrl);
-    if (url) {
-      externalTranscripts.push({
-        kind: "external-transcript",
-        label: new URL(url).hostname,
-        url,
-      });
-    }
+    if (url) onlineInformation.push({ kind: "online-information", label: new URL(url).hostname, url });
   }
 
   return {
     images: dedupeLinks(images),
     models: [...new Map(models.map((model) => [model.url, model])).values()],
     externalTranscripts: dedupeLinks(externalTranscripts),
+    onlineDigitizations: dedupeLinks(onlineDigitizations),
+    external3dModels: dedupeLinks(external3dModels),
+    onlineInformation: dedupeLinks(onlineInformation),
   };
+}
+
+function identifierLinks(entity: WikibaseEntity): { dois: SourceLink[]; wikidataItems: SourceLink[]; oareIds: SourceLink[] } {
+  const dois = stringValues(entity, FACTGRID_PROPERTIES.doi).flatMap((raw): SourceLink[] => {
+    const doi = raw.trim();
+    return /^10\.\d{4,9}\/\S+$/iu.test(doi) && doi.length <= 255
+      ? [{ kind: "doi", label: doi, url: `https://doi.org/${encodeURIComponent(doi).replace(/%2F/giu, "/")}` }]
+      : [];
+  });
+  const wikidataIds = [
+    ...stringValues(entity, FACTGRID_PROPERTIES.wikidataId),
+    entity.sitelinks?.wikidatawiki?.title ?? "",
+  ];
+  const wikidataItems = wikidataIds.flatMap((raw): SourceLink[] => {
+    const id = raw.trim().toUpperCase();
+    return /^Q[1-9]\d*$/u.test(id) && id.length <= 32
+      ? [{ kind: "wikidata-item", label: id, url: `https://www.wikidata.org/wiki/${id}` }]
+      : [];
+  });
+  const oareIds = stringValues(entity, FACTGRID_PROPERTIES.oareId).flatMap((raw): SourceLink[] => {
+    const id = raw.trim();
+    return /^[A-Za-z0-9][A-Za-z0-9._-]{0,99}$/u.test(id)
+      ? [{ kind: "oare-id", label: id, url: `https://oare.byu.edu/epigraphies/${encodeURIComponent(id)}` }]
+      : [];
+  });
+  return { dois: dedupeLinks(dois), wikidataItems: dedupeLinks(wikidataItems), oareIds: dedupeLinks(oareIds) };
 }
 
 function dedupeLinks(links: SourceLink[]): SourceLink[] {
@@ -203,31 +250,31 @@ function dedupeLinks(links: SourceLink[]): SourceLink[] {
   });
 }
 
-function dimensions(entity: WikibaseEntity, labels: LabelMap): DimensionValue[] {
-  const entries = Object.entries(FACTGRID_PROPERTIES.dimensions) as Array<
-    [DimensionValue["kind"], DimensionValue["property"]]
-  >;
-  const result: DimensionValue[] = [];
-
-  for (const [kind, property] of entries) {
-    for (const value of statementValues(entity, property)) {
-      if (!value || typeof value !== "object") continue;
-      const quantity = value as { amount?: unknown; unit?: unknown };
-      if (typeof quantity.amount !== "string" || !/^[+-]?(?:\d+(?:\.\d*)?|\.\d+)$/.test(quantity.amount)) {
-        continue;
-      }
-      let unit: LabeledEntity | undefined;
-      if (typeof quantity.unit === "string" && quantity.unit.startsWith(FACTGRID.entityBase)) {
-        try {
-          unit = labeledEntity(parseQid(quantity.unit.slice(FACTGRID.entityBase.length), "Unit QID"), labels);
-        } catch {
-          // Unknown units stay absent rather than becoming unsafe links.
-        }
-      }
-      result.push({ kind, property, amount: quantity.amount.replace(/^\+/, ""), unit });
+function quantities(entity: WikibaseEntity, property: QuantityValue["property"], labels: LabelMap): QuantityValue[] {
+  const result: QuantityValue[] = [];
+  for (const value of statementValues(entity, property)) {
+    if (!value || typeof value !== "object") continue;
+    const quantity = value as { amount?: unknown; unit?: unknown };
+    if (typeof quantity.amount !== "string" || !/^[+-]?(?:\d+(?:\.\d*)?|\.\d+)$/.test(quantity.amount)) {
+      continue;
     }
+    let unit: LabeledEntity | undefined;
+    if (typeof quantity.unit === "string" && quantity.unit.startsWith(FACTGRID.entityBase)) {
+      try {
+        unit = labeledEntity(parseQid(quantity.unit.slice(FACTGRID.entityBase.length), "Unit QID"), labels);
+      } catch {
+        // Unknown units stay absent rather than becoming unsafe links.
+      }
+    }
+    result.push({ property, amount: quantity.amount.replace(/^\+/, ""), unit });
   }
   return result;
+}
+
+function dimensions(entity: WikibaseEntity, labels: LabelMap): DimensionValue[] {
+  return (Object.entries(FACTGRID_PROPERTIES.dimensions) as Array<
+    [DimensionValue["kind"], DimensionValue["property"]]
+  >).flatMap(([kind, property]) => quantities(entity, property, labels).map((value) => ({ ...value, kind })));
 }
 
 export function entityIsCuneiformTablet(entity: WikibaseEntity): boolean {
@@ -242,12 +289,20 @@ export function collectReferencedQids(entity: WikibaseEntity): Qid[] {
     FACTGRID_PROPERTIES.language,
     FACTGRID_PROPERTIES.workType,
     FACTGRID_PROPERTIES.material,
+    FACTGRID_PROPERTIES.publishedIn,
+    FACTGRID_PROPERTIES.author,
+    FACTGRID_PROPERTIES.addressee,
+    FACTGRID_PROPERTIES.containsDocumentsOf,
   ];
   const result = new Set<Qid>();
   for (const property of properties) {
     for (const qid of entityQids(entity, property)) result.add(qid);
   }
-  for (const property of Object.values(FACTGRID_PROPERTIES.dimensions)) {
+  for (const property of [
+    ...Object.values(FACTGRID_PROPERTIES.dimensions),
+    FACTGRID_PROPERTIES.surfaceArea,
+    FACTGRID_PROPERTIES.volume,
+  ]) {
     for (const value of statementValues(entity, property)) {
       if (!value || typeof value !== "object") continue;
       const unit = (value as { unit?: unknown }).unit;
@@ -259,6 +314,7 @@ export function collectReferencedQids(entity: WikibaseEntity): Qid[] {
       }
     }
   }
+  for (const qid of entityQids(entity, FACTGRID_PROPERTIES.personMentioned)) result.add(qid);
   return [...result];
 }
 
@@ -274,6 +330,7 @@ export function adaptTabletEntity(entity: WikibaseEntity, labels: LabelMap = {})
   const title = rawTitle ?? bestTerm(entity.labels) ?? qid;
   const description = bestTerm(entity.descriptions);
   const sources = sourceLinks(entity);
+  const identifiers = identifierLinks(entity);
   const holdingStatements = activeStatements(entity, FACTGRID_PROPERTIES.presentHolding);
   const documentStatements = activeStatements(entity, FACTGRID_PROPERTIES.documentPage).filter(
     (statement) => statementStringValue(statement) !== undefined,
@@ -312,20 +369,33 @@ export function adaptTabletEntity(entity: WikibaseEntity, labels: LabelMap = {})
     revisionId: entity.lastrevid,
     modified: entity.modified,
     cdliIds: [...new Set(stringValues(entity, FACTGRID_PROPERTIES.cdliId))],
+    oareIds: identifiers.oareIds,
+    dois: identifiers.dois,
+    wikidataItems: identifiers.wikidataItems,
     inventoryNumbers: [
       ...new Set(
         qualifierStringValues(holdingStatements, FACTGRID_PROPERTIES.inventoryNumber),
       ),
     ],
     holdings: toLabels(FACTGRID_PROPERTIES.presentHolding),
+    publications: toLabels(FACTGRID_PROPERTIES.publishedIn),
+    authors: toLabels(FACTGRID_PROPERTIES.author),
+    addressees: toLabels(FACTGRID_PROPERTIES.addressee),
+    documentGroups: toLabels(FACTGRID_PROPERTIES.containsDocumentsOf),
+    mentionedPeople: toLabels(FACTGRID_PROPERTIES.personMentioned),
     findspots: toLabels(FACTGRID_PROPERTIES.findspot),
     periods: toLabels(FACTGRID_PROPERTIES.period),
     languages: toLabels(FACTGRID_PROPERTIES.language),
     workTypes: toLabels(FACTGRID_PROPERTIES.workType),
     materials: toLabels(FACTGRID_PROPERTIES.material),
     dimensions: dimensions(entity, labels),
+    surfaceAreas: quantities(entity, FACTGRID_PROPERTIES.surfaceArea, labels),
+    volumes: quantities(entity, FACTGRID_PROPERTIES.volume, labels),
     images: sources.images,
     models: sources.models,
+    onlineDigitizations: sources.onlineDigitizations,
+    onlineInformation: sources.onlineInformation,
+    external3dModels: sources.external3dModels,
     externalTranscripts: sources.externalTranscripts,
     editions,
     omittedEditionCount: Math.max(0, documentStatements.length - selectedDocuments.length),

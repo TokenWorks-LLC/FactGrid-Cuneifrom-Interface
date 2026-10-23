@@ -165,11 +165,16 @@ globalThis.fetch = async (input, init) => {
     if (!tabletRequest && !labelRequest) {
       throw new Error("Unexpected entity IDs in FactGrid acceptance fixture.");
     }
+    const baseProps = "info|labels|descriptions|claims";
+    const props = url.searchParams.get("props");
+    if (props !== baseProps && !(tabletRequest && props === `${baseProps}|sitelinks`)) {
+      throw new Error("Unexpected props in FactGrid fixture request.");
+    }
     assertParameters(url, {
       action: "wbgetentities",
       format: "json",
       formatversion: "2",
-      props: "info|labels|descriptions|claims",
+      props: undefined,
       languages: "en|de",
       languagefallback: "1",
       ids: ids.join("|"),
