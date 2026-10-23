@@ -11,6 +11,7 @@ import type {
   DocumentRevision,
   LabeledEntity,
   MediaWikiPage,
+  ModelSource,
   Qid,
   SourceLink,
   TabletEdition,
@@ -135,9 +136,11 @@ function safePublicUrl(value: string): string | undefined {
 
 function sourceLinks(entity: WikibaseEntity): {
   images: SourceLink[];
+  models: ModelSource[];
   externalTranscripts: SourceLink[];
 } {
   const images: SourceLink[] = [];
+  const models: ModelSource[] = [];
   const externalTranscripts: SourceLink[] = [];
 
   for (const rawUrl of stringValues(entity, FACTGRID_PROPERTIES.onlineImage)) {
@@ -155,6 +158,23 @@ function sourceLinks(entity: WikibaseEntity): {
     }
   }
 
+  for (const rawUrl of stringValues(entity, FACTGRID_PROPERTIES.externalModel)) {
+    const url = safePublicUrl(rawUrl);
+    if (!url) continue;
+    const parsed = new URL(url);
+    models.push({
+      url,
+      // The Heidelberg PLY collection is confirmed to support browser CORS.
+      // Other sources remain links until their format and CORS are verified.
+      viewable:
+        parsed.protocol === "https:" &&
+        parsed.hostname === "heidicon.ub.uni-heidelberg.de" &&
+        parsed.port === "" &&
+        parsed.pathname.startsWith("/eas/") &&
+        parsed.pathname.toLowerCase().endsWith(".ply"),
+    });
+  }
+
   // P69 is always a link. It is never fetched, imported, or treated as editable.
   for (const rawUrl of stringValues(entity, FACTGRID_PROPERTIES.onlineTranscript)) {
     const url = safePublicUrl(rawUrl);
@@ -169,6 +189,7 @@ function sourceLinks(entity: WikibaseEntity): {
 
   return {
     images: dedupeLinks(images),
+    models: [...new Map(models.map((model) => [model.url, model])).values()],
     externalTranscripts: dedupeLinks(externalTranscripts),
   };
 }
@@ -304,6 +325,7 @@ export function adaptTabletEntity(entity: WikibaseEntity, labels: LabelMap = {})
     materials: toLabels(FACTGRID_PROPERTIES.material),
     dimensions: dimensions(entity, labels),
     images: sources.images,
+    models: sources.models,
     externalTranscripts: sources.externalTranscripts,
     editions,
     omittedEditionCount: Math.max(0, documentStatements.length - selectedDocuments.length),

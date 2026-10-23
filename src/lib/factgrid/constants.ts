@@ -29,6 +29,7 @@ export const FACTGRID_PROPERTIES = Object.freeze({
   cdliId: "P692",
   findspot: "P695",
   period: "P853",
+  externalModel: "P1034",
 });
 
 export const FACTGRID_LIMITS = Object.freeze({

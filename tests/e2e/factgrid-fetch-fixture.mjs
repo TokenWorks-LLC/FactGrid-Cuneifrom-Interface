@@ -19,6 +19,14 @@ linkedMissingTablet.claims.P251 = [{
     datavalue: { type: "string", value: "https://database.factgrid.de/wiki/D-Q9000003" },
   },
 }];
+sparseTablet.claims.P1034 = [{
+  id: "Q9000001$fixture-model",
+  rank: "normal",
+  mainsnak: {
+    property: "P1034", datatype: "url", snaktype: "value",
+    datavalue: { type: "string", value: "https://heidicon.ub.uni-heidelberg.de/eas/fixture/tablet.ply" },
+  },
+}];
 const revisions = JSON.parse(
   readFileSync(join(fixtureRoot, "document-revisions.json"), "utf8"),
 );

@@ -155,7 +155,9 @@ unknown and accepted-unconfirmed outcomes retain it.
 React escapes record strings and transcript previews. Wikitext display is reduced to
 sanitized plain text; raw MediaWiki HTML is never injected. External URLs are
 scheme-validated and rendered as outbound links. Record images remain links unless
-item-specific reuse rights are known.
+item-specific reuse rights are known. P1034 model URLs are validated as outbound
+links. Confirmed Heidelberg PLY files are fetched directly by the browser only
+after the reader activates the viewer; unsupported models remain source links.
 
 ## Simplicity review — 29 September 2026
 
