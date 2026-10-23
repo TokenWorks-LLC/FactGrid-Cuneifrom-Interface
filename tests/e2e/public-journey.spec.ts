@@ -196,6 +196,18 @@ test("plain Transcript-section poems remain readable", async ({ page }) => {
   ).toBe(true);
 });
 
+test("record material opens a filtered overview and keeps its definition link", async ({ page }) => {
+  await page.goto("/tablets/Q9000002");
+  const clayLink = page.getByRole("link", { name: "TEST FIXTURE clay", exact: true });
+  await expect(clayLink).toHaveAttribute("href", "/browse?material=Q9000103");
+  await expect(page.getByRole("link", { name: "View TEST FIXTURE clay in FactGrid" })).toHaveAttribute("href", "https://database.factgrid.de/wiki/Item:Q9000103");
+  await clayLink.click();
+  await expect(page).toHaveURL(/\/browse\?material=Q9000103$/);
+  await expect(page.getByRole("heading", { name: "Browse tablets" })).toBeVisible();
+  await expect(page.getByLabel("Material", { exact: true })).toHaveValue("Q9000103");
+  await expect(page.getByRole("link", { name: /TEST FIXTURE.*tablet with editions/ }).first()).toHaveAttribute("href", "/tablets/Q9000002");
+});
+
 test("Unicode editions offer a font choice in the edition and comparison views", async ({ page }) => {
   await page.goto("/tablets/Q9000002");
 

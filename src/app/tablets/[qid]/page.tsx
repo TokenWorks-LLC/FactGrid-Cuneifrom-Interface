@@ -115,13 +115,13 @@ export default async function TabletPage({ params }: TabletPageProps) {
             <MetadataLinks label="OARE ID" values={tablet.oareIds} />
             <MetadataLinks label="DOI" values={tablet.dois} />
             <MetadataLinks label="Wikidata" values={tablet.wikidataItems} />
-            <MetadataEntities label="Collection / holding" values={tablet.holdings} />
+            <MetadataEntities label="Collection / holding" filter="collection" values={tablet.holdings} />
             <MetadataEntities label="Published in" values={tablet.publications} />
-            <MetadataEntities label="Finding spot" values={tablet.findspots} />
-            <MetadataEntities label="Period / style" values={tablet.periods} />
-            <MetadataEntities label="Language" values={tablet.languages} />
-            <MetadataEntities label="Type of work" values={tablet.workTypes} />
-            <MetadataEntities label="Material" values={tablet.materials} />
+            <MetadataEntities label="Finding spot" filter="findspot" values={tablet.findspots} />
+            <MetadataEntities label="Period / style" filter="period" values={tablet.periods} />
+            <MetadataEntities label="Language" filter="language" values={tablet.languages} />
+            <MetadataEntities label="Type of work" filter="workType" values={tablet.workTypes} />
+            <MetadataEntities label="Material" filter="material" values={tablet.materials} />
             <MetadataEntities label="Author" values={tablet.authors} />
             <MetadataEntities label="Addressed to" values={tablet.addressees} />
             <MetadataEntities label="Contains documents of" values={tablet.documentGroups} />
@@ -274,18 +274,37 @@ function MetadataRow({ label, values, mono = false }: { label: string; values: s
   );
 }
 
-function MetadataEntities({ label, values }: { label: string; values: LabeledEntity[] }) {
+function MetadataEntities({
+  label,
+  filter,
+  values,
+}: {
+  label: string;
+  filter?: "collection" | "findspot" | "period" | "language" | "workType" | "material";
+  values: LabeledEntity[];
+}) {
   return (
     <div className="py-3.5">
       <dt className="text-xs font-medium text-muted-foreground">{label}</dt>
       <dd className="mt-1 text-sm">
         {values.length > 0
           ? values.map((value, index) => (
-              <span key={value.id}>
+              <span className={filter ? "inline-flex flex-wrap items-center gap-x-1" : undefined} key={value.id}>
                 {index > 0 ? ", " : null}
-                <a className="underline decoration-border underline-offset-4 hover:decoration-primary" href={value.url} rel="noreferrer" target="_blank">
-                  {value.label}
-                </a>
+                {filter ? (
+                  <>
+                    <Link className="focus-ring underline decoration-border underline-offset-4 hover:decoration-primary" href={`/browse?${filter}=${value.id}`}>
+                      {value.label}
+                    </Link>
+                    <a aria-label={`View ${value.label} in FactGrid`} className="focus-ring inline-flex min-h-8 items-center text-muted-foreground hover:text-foreground" href={value.url} rel="noreferrer" target="_blank" title={`View ${value.label} in FactGrid`}>
+                      <ExternalLink aria-hidden="true" className="size-3.5" />
+                    </a>
+                  </>
+                ) : (
+                  <a className="focus-ring underline decoration-border underline-offset-4 hover:decoration-primary" href={value.url} rel="noreferrer" target="_blank">
+                    {value.label}
+                  </a>
+                )}
               </span>
             ))
           : "Not recorded in FactGrid"}
