@@ -45,6 +45,11 @@
             "rank": "normal",
             "mainsnak": { "snaktype": "value", "property": "P853", "datatype": "wikibase-item", "datavalue": { "type": "wikibase-entityid", "value": { "id": "Q9000102" } } }
           }],
+          "P401": [{
+            "id": "Q9000002$fixture-material",
+            "rank": "normal",
+            "mainsnak": { "snaktype": "value", "property": "P401", "datatype": "wikibase-item", "datavalue": { "type": "wikibase-entityid", "value": { "id": "Q9000103" } } }
+          }],
           "P59": [{
             "id": "Q9000002$fixture-height",
             "rank": "normal",

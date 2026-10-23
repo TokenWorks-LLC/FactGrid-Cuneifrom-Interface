@@ -30,6 +30,7 @@ const labels = {
   Q9000100: "TEST FIXTURE collection",
   Q9000101: "TEST FIXTURE findspot",
   Q9000102: "TEST FIXTURE period",
+  Q9000103: "TEST FIXTURE clay",
 };
 const relatedQids = new Set(Object.keys(labels));
 const documentTitles = new Set([
@@ -97,6 +98,7 @@ globalThis.fetch = async (input, init) => {
     const allowedExpressions = new Set([
       'haswbstatement:P2=Q512006 "Prag" "I" "437"',
       'haswbstatement:P2=Q512006 haswbstatement:P329=Q9000100 "TEST" "FIXTURE"',
+      'haswbstatement:P2=Q512006 haswbstatement:P401=Q9000103',
     ]);
     if (!allowedExpressions.has(expression)) {
       throw new Error("Unexpected catalogue search expression in acceptance fixture.");
