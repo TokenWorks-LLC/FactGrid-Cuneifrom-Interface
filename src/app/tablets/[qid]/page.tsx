@@ -6,6 +6,7 @@ import { ArrowLeft, ExternalLink, FileText, ImageIcon, LockKeyhole, PencilLine }
 
 import { EditionComparison } from "@/components/edition-comparison";
 import { EditionEditGate } from "@/components/edition-edit-gate";
+import { UnicodeText } from "@/components/unicode-text";
 import { Badge } from "@/components/ui/badge";
 import { isEditTargetEnabled, parseAllowedEditTargets } from "@/lib/edit/targets";
 import { FactGridNotFoundError, type LabeledEntity, type TabletEdition } from "@/lib/factgrid";
@@ -54,6 +55,7 @@ export default async function TabletPage({ params }: TabletPageProps) {
         label: edition.label,
         sourceTitle: edition.reference?.title ?? `Edition ${index + 1}`,
         text: wikitextToPlainText(transcript.displayText),
+        kind: edition.kind,
       },
     ];
   });
@@ -201,7 +203,7 @@ export default async function TabletPage({ params }: TabletPageProps) {
             </nav>
           ) : null}
 
-          <EditionComparison editions={comparisonEditions} />
+          <EditionComparison editions={comparisonEditions} periodLabels={tablet.periods.map((period) => period.label)} />
 
           {tablet.editions.map((edition, index) => (
             <EditionSection
@@ -210,6 +212,7 @@ export default async function TabletPage({ params }: TabletPageProps) {
               index={index}
               key={edition.editionId ?? edition.reference?.url ?? index}
               qid={tablet.qid}
+              periodLabels={tablet.periods.map((period) => period.label)}
             />
           ))}
 
@@ -294,11 +297,13 @@ function EditionSection({
   expandedByDefault,
   index,
   qid,
+  periodLabels,
 }: {
   edition: TabletEdition;
   expandedByDefault: boolean;
   index: number;
   qid: string;
+  periodLabels: string[];
 }) {
   const revision = edition.revision;
   const transcript = revision?.transcript;
@@ -379,10 +384,21 @@ function EditionSection({
                   {readOnlyReason}
                 </p>
               ) : null}
-              <pre className="transcript-text mt-4 overflow-x-auto border border-border bg-card p-5 text-sm leading-7 break-words whitespace-pre-wrap sm:p-7">
-                {wikitextToPlainText(transcript.displayText) ||
-                  "The recognized transcript region is empty."}
-              </pre>
+              {edition.kind === "unicode" ? (
+                <div className="mt-4">
+                  <UnicodeText
+                    className="mt-3 overflow-x-auto border border-border bg-card p-5 text-sm leading-7 break-words whitespace-pre-wrap sm:p-7"
+                    fontLabel="Cuneiform font for Unicode edition"
+                    periodLabels={periodLabels}
+                    text={wikitextToPlainText(transcript.displayText)}
+                  />
+                </div>
+              ) : (
+                <pre className="transcript-text mt-4 overflow-x-auto border border-border bg-card p-5 text-sm leading-7 break-words whitespace-pre-wrap sm:p-7">
+                  {wikitextToPlainText(transcript.displayText) ||
+                    "The recognized transcript region is empty."}
+                </pre>
+              )}
             </div>
           ) : (
             <p className="mt-6 max-w-[68ch] text-sm leading-6 text-muted-foreground">

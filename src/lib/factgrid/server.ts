@@ -583,6 +583,64 @@ export function createFactGridClient(options: FactGridClientOptions = {}) {
     };
   }
 
+  async function searchFacetEntities(term: string): Promise<TabletFacets["collections"]> {
+    const query = term.trim();
+    if (query.length < 2 || query.length > FACTGRID_LIMITS.maxQueryLength) {
+      throw new FactGridError("INVALID_INPUT", "Facet search must be 2–100 characters.", {
+        status: 400,
+      });
+    }
+    type EntitySearchResponse = {
+      error?: { info?: string };
+      search?: Array<{ id?: string; label?: string }>;
+    };
+    const responses = await Promise.all(
+      (["en", "de"] as const).map((language) =>
+        mediaWikiApi<EntitySearchResponse>(
+          {
+            action: "wbsearchentities",
+            format: "json",
+            language,
+            uselang: language,
+            type: "item",
+            search: query,
+            limit: "20",
+          },
+          { cache: "no-store" },
+        ),
+      ),
+    );
+    const results = new Map<Qid, TabletFacets["collections"][number]>();
+    for (const response of responses) {
+      if (response.error || !Array.isArray(response.search)) {
+        throw new FactGridError(
+          "UPSTREAM_PROTOCOL",
+          response.error?.info ?? "FactGrid returned an invalid entity search response.",
+          { status: 502, retryable: true },
+        );
+      }
+      for (const item of response.search) {
+        let id: Qid;
+        try {
+          id = parseQid(item.id ?? "", "Facet QID");
+        } catch {
+          throw new FactGridError("UPSTREAM_PROTOCOL", "FactGrid returned a malformed facet entity.", {
+            status: 502,
+            retryable: true,
+          });
+        }
+        if (!results.has(id)) {
+          results.set(id, {
+            id,
+            label: typeof item.label === "string" && item.label.trim() ? item.label : id,
+            url: `${FACTGRID.wikiBase}Item:${id}`,
+          });
+        }
+      }
+    }
+    return [...results.values()];
+  }
+
   async function facetQids(property: "P329" | "P695" | "P853"): Promise<Qid[]> {
     const query = buildFacetQuery(property);
     const response = await requestJson<SparqlResponse>(new URL(FACTGRID.sparql), {
@@ -626,6 +684,7 @@ export function createFactGridClient(options: FactGridClientOptions = {}) {
     getTablet,
     hasCanonicalTranscription,
     getTabletFacets,
+    searchFacetEntities,
     resolveCurrentEdition,
     searchTablets,
   });
@@ -637,5 +696,6 @@ export const getTablet = defaultClient.getTablet;
 export const hasCanonicalTranscription = defaultClient.hasCanonicalTranscription;
 export const getEditableTabletEntity = defaultClient.getEditableTabletEntity;
 export const getTabletFacets = defaultClient.getTabletFacets;
+export const searchFacetEntities = defaultClient.searchFacetEntities;
 export const resolveCurrentEdition = defaultClient.resolveCurrentEdition;
 export const searchTablets = defaultClient.searchTablets;
