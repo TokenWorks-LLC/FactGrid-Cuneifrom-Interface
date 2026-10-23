@@ -1,19 +1,21 @@
 "use client";
 
 import { useRef, useState, useSyncExternalStore, type RefObject, type UIEvent } from "react";
+import { UnicodeText } from "@/components/unicode-text";
 
 export interface ComparableEdition {
   id: string;
   label: string;
   sourceTitle: string;
   text: string;
+  kind: string;
 }
 
 const subscribeToHydration = () => () => undefined;
 const getHydratedSnapshot = () => true;
 const getServerHydrationSnapshot = () => false;
 
-export function EditionComparison({ editions }: { editions: ComparableEdition[] }) {
+export function EditionComparison({ editions, periodLabels }: { editions: ComparableEdition[]; periodLabels: string[] }) {
   const [leftIndex, setLeftIndex] = useState(0);
   const [rightIndex, setRightIndex] = useState(1);
   const interactive = useSyncExternalStore(
@@ -69,6 +71,7 @@ export function EditionComparison({ editions }: { editions: ComparableEdition[] 
         <ComparisonPane
           edition={left}
           editions={editions}
+          periodLabels={periodLabels}
           interactive={interactive}
           onChange={setLeftIndex}
           onScroll={(event) => synchronize(event, rightRef)}
@@ -79,6 +82,7 @@ export function EditionComparison({ editions }: { editions: ComparableEdition[] 
         <ComparisonPane
           edition={right}
           editions={editions}
+          periodLabels={periodLabels}
           interactive={interactive}
           onChange={setRightIndex}
           onScroll={(event) => synchronize(event, leftRef)}
@@ -94,6 +98,7 @@ export function EditionComparison({ editions }: { editions: ComparableEdition[] 
 function ComparisonPane({
   edition,
   editions,
+  periodLabels,
   interactive,
   onChange,
   onScroll,
@@ -103,6 +108,7 @@ function ComparisonPane({
 }: {
   edition: ComparableEdition;
   editions: ComparableEdition[];
+  periodLabels: string[];
   interactive: boolean;
   onChange: (value: number) => void;
   onScroll: (event: UIEvent<HTMLPreElement>) => void;
@@ -128,15 +134,29 @@ function ComparisonPane({
           </option>
         ))}
       </select>
-      <pre
-        ref={paneRef}
-        aria-label={`${edition.label}, ${edition.sourceTitle}`}
-        className="transcript-text mt-3 h-[30rem] overflow-auto border border-border bg-card p-4 text-sm leading-6 whitespace-pre-wrap"
-        onScroll={onScroll}
-        tabIndex={0}
-      >
-        {edition.text || "The recognized transcript region is empty."}
-      </pre>
+      {edition.kind === "unicode" ? (
+        <div className="mt-3">
+          <UnicodeText
+            ariaLabel={`${edition.label}, ${edition.sourceTitle}`}
+            className="mt-3 h-[30rem] overflow-auto border border-border bg-card p-4 text-sm leading-6 whitespace-pre-wrap"
+            fontLabel={`Cuneiform font for ${pane} comparison`}
+            onScroll={onScroll}
+            periodLabels={periodLabels}
+            preRef={paneRef}
+            text={edition.text}
+          />
+        </div>
+      ) : (
+        <pre
+          ref={paneRef}
+          aria-label={`${edition.label}, ${edition.sourceTitle}`}
+          className="transcript-text mt-3 h-[30rem] overflow-auto border border-border bg-card p-4 text-sm leading-6 whitespace-pre-wrap"
+          onScroll={onScroll}
+          tabIndex={0}
+        >
+          {edition.text || "The recognized transcript region is empty."}
+        </pre>
+      )}
     </div>
   );
 }

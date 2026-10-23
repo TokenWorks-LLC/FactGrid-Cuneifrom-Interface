@@ -2,6 +2,8 @@
 
 import { useEffect, useRef, useState } from "react";
 
+import { fitSphereDistance } from "@/lib/model-camera";
+
 const MAX_MODEL_BYTES = 75_000_000;
 
 async function fetchModel(url: string, signal: AbortSignal, onProgress: (percent: number) => void) {
@@ -112,9 +114,11 @@ export function TabletModelViewer({ title, url }: { title: string; url: string }
           mesh.position.copy(sphere.center).multiplyScalar(-1);
           scene.add(mesh);
 
-          const camera = new THREE.PerspectiveCamera(45, 1, sphere.radius / 1_000, sphere.radius * 30);
-          const distance = sphere.radius * 2.8;
-          camera.position.set(0, 0, distance);
+          const initialAspect = mount!.clientWidth > 0 && mount!.clientHeight > 0
+            ? mount!.clientWidth / mount!.clientHeight
+            : 1;
+          const camera = new THREE.PerspectiveCamera(45, initialAspect, sphere.radius / 1_000, sphere.radius * 30);
+          camera.position.set(0, 0, fitSphereDistance(sphere.radius, camera.fov, initialAspect));
           const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: "default" });
           renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
           renderer.domElement.setAttribute("aria-label", `3D model of ${title}. Drag to rotate, scroll or pinch to zoom.`);
@@ -127,7 +131,17 @@ export function TabletModelViewer({ title, url }: { title: string; url: string }
           controls.minDistance = sphere.radius * 1.05;
           controls.maxDistance = sphere.radius * 12;
           controls.listenToKeyEvents(renderer.domElement);
+          let atFit = true;
+          const markInteracted = () => { atFit = false; };
+          controls.addEventListener("start", markInteracted);
           const render = () => renderer.render(scene, camera);
+          const fitView = () => {
+            const distance = fitSphereDistance(sphere.radius, camera.fov, camera.aspect);
+            camera.position.set(0, 0, distance);
+            controls.target.set(0, 0, 0);
+            controls.maxDistance = Math.max(sphere.radius * 12, distance * 2);
+            controls.update();
+          };
           const resize = () => {
             if (!mount) return;
             const width = mount.clientWidth;
@@ -136,22 +150,22 @@ export function TabletModelViewer({ title, url }: { title: string; url: string }
             camera.aspect = width / height;
             camera.updateProjectionMatrix();
             renderer.setSize(width, height);
-            render();
+            if (atFit) fitView();
+            else render();
           };
           controls.addEventListener("change", render);
           const observer = new ResizeObserver(resize);
           observer.observe(mount!);
           resize();
           resetViewRef.current = () => {
-            camera.position.set(0, 0, distance);
-            controls.target.set(0, 0, 0);
-            controls.update();
-            render();
+            atFit = true;
+            fitView();
           };
           disposeViewer = () => {
             resetViewRef.current = null;
             observer.disconnect();
             controls.removeEventListener("change", render);
+            controls.removeEventListener("start", markInteracted);
             controls.dispose();
             renderer.dispose();
             renderer.domElement.remove();

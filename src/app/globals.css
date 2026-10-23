@@ -2,6 +2,20 @@
 @import "tw-animate-css";
 @import "shadcn/tailwind.css";
 
+@font-face {
+  font-family: "Cuneiform OB";
+  src: url("/fonts/CuneiformOB.ttf") format("truetype");
+  font-display: swap;
+  unicode-range: U+12000-123FF, U+12400-1247F, U+12480-1254F;
+}
+
+@font-face {
+  font-family: "Cuneiform NA";
+  src: url("/fonts/CuneiformNA.ttf") format("truetype");
+  font-display: swap;
+  unicode-range: U+12000-123FF, U+12400-1247F, U+12480-1254F;
+}
+
 @custom-variant dark (&:is(.dark *));
 
 @theme inline {
@@ -135,6 +149,14 @@
 
   .transcript-text {
     font-family: var(--font-plex-mono), var(--font-noto-cuneiform), monospace;
+  }
+
+  .unicode-font-text[data-unicode-font="old-babylonian"] {
+    font-family: "Cuneiform OB", var(--font-plex-mono), var(--font-noto-cuneiform), monospace;
+  }
+
+  .unicode-font-text[data-unicode-font="neo-assyrian"] {
+    font-family: "Cuneiform NA", var(--font-plex-mono), var(--font-noto-cuneiform), monospace;
   }
 
   .hero-surface {

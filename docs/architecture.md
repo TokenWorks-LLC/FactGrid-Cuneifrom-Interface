@@ -33,8 +33,9 @@ adapters, and source-format rules. It:
 4. resolves bounded P251 document links to exact FactGrid titles and reads their
    current revisions;
 5. derives contextual collection, findspot, and period choices from structured
-   values on the current result page, then pushes a selected QID back into the
-   Cirrus membership query before pagination;
+   values on the current result page and searches FactGrid entity names on demand
+   for additional values, then pushes a selected QID back into the Cirrus
+   membership query before pagination;
 6. keeps P69 external transcripts and unlicensed image URLs as outbound links.
 
 Requests use fixed FactGrid hosts and paths, blocked redirects, timeouts, response
