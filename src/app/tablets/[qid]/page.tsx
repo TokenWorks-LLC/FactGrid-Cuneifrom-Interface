@@ -2,10 +2,11 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { connection } from "next/server";
-import { ArrowLeft, ExternalLink, FileText, ImageIcon, LockKeyhole, PencilLine } from "lucide-react";
+import { ArrowLeft, ExternalLink, FileText, LockKeyhole, PencilLine } from "lucide-react";
 
 import { EditionComparison } from "@/components/edition-comparison";
 import { EditionEditGate } from "@/components/edition-edit-gate";
+import { TabletImageViewer } from "@/components/tablet-image-viewer";
 import { TabletModelViewer } from "@/components/tablet-model-viewer";
 import { UnicodeText } from "@/components/unicode-text";
 import { Badge } from "@/components/ui/badge";
@@ -141,39 +142,10 @@ export default async function TabletPage({ params }: TabletPageProps) {
             <MetadataLinks label="External 3D model" values={tablet.external3dModels} />
           </dl>
 
-          <div className="mt-9">
-            <h2 className="font-mono text-xs tracking-[0.12em] text-muted-foreground uppercase">Images</h2>
-            {tablet.images.length > 0 ? (
-              <ul className="mt-3 divide-y divide-border border-y border-border">
-                {tablet.images.map((image) => (
-                  <li key={image.url}>
-                    <a
-                      className="focus-ring flex min-h-12 items-center justify-between gap-3 py-3 text-sm font-medium hover:text-primary"
-                      href={image.url}
-                      rel="noreferrer"
-                      target="_blank"
-                    >
-                      <span className="flex min-w-0 items-center gap-2">
-                        <ImageIcon aria-hidden="true" className="size-4 shrink-0" />
-                        <span className="truncate">{image.label}</span>
-                      </span>
-                      <ExternalLink aria-hidden="true" className="size-4 shrink-0" />
-                    </a>
-                  </li>
-                ))}
-              </ul>
-            ) : (
-              <p className="mt-3 text-sm leading-6 text-muted-foreground">No image link is recorded in the supported FactGrid properties.</p>
-            )}
-            {tablet.images.length > 0 ? (
-              <p className="mt-3 text-xs leading-5 text-muted-foreground">
-                Rights vary by source. Images are linked until item-specific reuse terms can be verified.
-              </p>
-            ) : null}
-          </div>
         </aside>
 
         <div className="order-1 min-w-0 lg:order-2">
+          {tablet.images.length > 0 ? <div className="mb-12"><TabletImageViewer images={tablet.images} /></div> : null}
           {tablet.models.length > 0 ? (
             <section aria-labelledby="models-heading" className="mb-12 border-b border-border pb-10">
               <h2 className="font-heading text-3xl font-medium" id="models-heading">3D models</h2>

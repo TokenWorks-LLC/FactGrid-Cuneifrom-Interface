@@ -196,6 +196,86 @@ test("plain Transcript-section poems remain readable", async ({ page }) => {
   ).toBe(true);
 });
 
+test("image viewer loads a IIIF manifest on demand and shows image qualifiers", async ({ page }) => {
+  let externalRequests = 0;
+  const png = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVQIHWP4z8DwHwAFgAI/ScL/nwAAAABJRU5ErkJggg==", "base64");
+  await page.route("https://images.example.test/**", async (route) => {
+    externalRequests += 1;
+    if (route.request().url().endsWith("/iiif/3/Q9000002")) {
+      await route.fulfill({
+        contentType: "application/json",
+        headers: { "Access-Control-Allow-Origin": "*" },
+        body: JSON.stringify({
+          type: "Manifest",
+          items: [{ label: { en: ["Front"] }, items: [{ items: [{ motivation: "painting", body: { id: "https://images.example.test/front.png" } }] }] }],
+        }),
+      });
+    } else {
+      await route.fulfill({ contentType: "image/png", body: png });
+    }
+  });
+
+  await page.goto("/tablets/Q9000002");
+  await expect(page.getByRole("heading", { name: "Images" })).toBeVisible();
+  expect(externalRequests).toBe(0);
+  await page.getByRole("button", { name: /Image 1 Top · 3D rendering/ }).click();
+  await expect(page.getByText("Object side: Top")).toBeVisible();
+  await expect(page.getByText("Media type: 3D rendering")).toBeVisible();
+  await expect(page.getByRole("link", { name: "Open source" })).toHaveAttribute("href", "https://images.example.test/iiif/3/Q9000002");
+  await expect.poll(() => externalRequests).toBeGreaterThan(1);
+  await expect(page.getByText("Loading image…")).toBeHidden();
+  await expect(page.locator('[aria-label="Image 1 zoom viewer"] canvas').first()).toBeVisible();
+});
+
+test("image viewer falls back when IIIF tiles fail after info.json opens", async ({ page }) => {
+  let failedTiles = 0;
+  let fallbackRequests = 0;
+  const png = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVQIHWP4z8DwHwAFgAI/ScL/nwAAAABJRU5ErkJggg==", "base64");
+  await page.route("https://images.example.test/**", async (route) => {
+    const url = route.request().url();
+    if (url.endsWith("/iiif/3/Q9000002")) {
+      await route.fulfill({
+        contentType: "application/json",
+        headers: { "Access-Control-Allow-Origin": "*" },
+        body: JSON.stringify({
+          type: "Manifest",
+          items: [{ items: [{ items: [{ motivation: "painting", body: {
+            id: "https://images.example.test/fallback.png",
+            service: [{ id: "https://images.example.test/iiif/image1" }],
+          } }] }] }],
+        }),
+      });
+    } else if (url.endsWith("/iiif/image1/info.json")) {
+      await route.fulfill({
+        contentType: "application/json",
+        headers: { "Access-Control-Allow-Origin": "*" },
+        body: JSON.stringify({
+          "@context": "http://iiif.io/api/image/2/context.json",
+          "@id": "https://images.example.test/iiif/image1",
+          protocol: "http://iiif.io/api/image",
+          width: 512,
+          height: 512,
+          profile: ["http://iiif.io/api/image/2/level2.json"],
+          tiles: [{ width: 256, scaleFactors: [1, 2] }],
+        }),
+      });
+    } else if (url.endsWith("/fallback.png")) {
+      fallbackRequests += 1;
+      await route.fulfill({ contentType: "image/png", body: png });
+    } else {
+      failedTiles += 1;
+      await route.fulfill({ status: 404, body: "Tile missing" });
+    }
+  });
+
+  await page.goto("/tablets/Q9000002");
+  await page.getByRole("button", { name: /Image 1 Top · 3D rendering/ }).click();
+  await expect.poll(() => failedTiles).toBeGreaterThan(0);
+  await expect.poll(() => fallbackRequests).toBeGreaterThan(0);
+  await expect(page.getByText("Tiled view is unavailable; showing the source image.")).toBeVisible();
+  await expect(page.locator('[aria-label="Image 1 zoom viewer"] canvas').first()).toBeVisible();
+});
+
 test("tablet model loads only on request and offers a reset control", async ({ page }) => {
   let modelRequests = 0;
   const header = Buffer.from([

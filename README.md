@@ -7,7 +7,7 @@ catalogue data, document pages, accounts, permissions, and revision history.
 The MVP provides:
 
 - membership-restricted tablet search with collection, findspot, and period filters;
-- stable QID-based record pages with metadata, source-separated editions, image links, and external transcript links;
+- stable QID-based record pages with metadata, source-separated editions, an on-demand image viewer, and external transcript links;
 - on-demand 3D viewing of supported Heidelberg PLY tablet models linked from FactGrid;
 - safe plain-text display of supported FactGrid document pages;
 - FactGrid OAuth 1.0a sign-in and signed API requests, with existing OAuth 2 support retained;

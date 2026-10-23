@@ -59,7 +59,9 @@ revalidates membership through current entity claims.
 | P121 | Work type |
 | P401 | Material |
 | P59, P60, P61 | Dimensions |
-| P188 | Online image URL |
+| P188 | Online image URL or IIIF manifest; displayed on demand in a zoomable viewer |
+| P1029 | Object's side qualifier on P188; shown per image |
+| P15 | Media type qualifier on P188; shown per image |
 | P189 | Wikimedia Commons image |
 | P1034 | External 3D model URL; Heidelberg PLY files can be viewed on demand |
 | P69 | Online transcript; kept as an external link |
@@ -149,10 +151,18 @@ allowlist entries or an explicitly approved authenticated-mode deployment.
 
 ## Images and rights
 
-P188 does not reliably encode item-specific reuse rights. Those images are linked,
-not proxied or embedded. The few P189 Commons values can provide stronger provenance,
-but each file still requires its own license check. The homepage uses one separately
-verified Commons photograph with visible attribution.
+P188 does not reliably encode item-specific reuse rights. A visitor can choose to
+load an image directly from its source in the record's zoom viewer; the application
+does not proxy or store it. Source links remain visible and viewing does not grant
+reuse rights. IIIF Image API URLs use tiles when their `info.json` supports CORS;
+the viewer falls back to the source image if metadata or tile loading fails.
+Presentation 2 and 3 manifest
+URLs can expose multiple canvases when the host allows cross-origin manifest reads.
+Image annotation overlays are not yet exposed; no FactGrid annotation-link property
+has been identified for these records. The few P189 Commons values can provide
+stronger provenance, but each file still
+requires its own license check. The homepage uses one separately verified Commons
+photograph with visible attribution.
 
 ## Identity and editing policy
 

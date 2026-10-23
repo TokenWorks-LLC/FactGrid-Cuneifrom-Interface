@@ -36,7 +36,8 @@ adapters, and source-format rules. It:
    values on the current result page and searches FactGrid entity names on demand
    for additional values, then pushes a selected QID back into the Cirrus
    membership query before pagination;
-6. keeps P69 external transcripts and unlicensed image URLs as outbound links.
+6. keeps P69 external transcripts as outbound links and loads external images only
+   when a visitor selects them in the viewer.
 
 Requests use fixed FactGrid hosts and paths, blocked redirects, timeouts, response
 size limits, bounded result counts, and an identifying user agent. Search snippets
@@ -155,10 +156,12 @@ unknown and accepted-unconfirmed outcomes retain it.
 
 React escapes record strings and transcript previews. Wikitext display is reduced to
 sanitized plain text; raw MediaWiki HTML is never injected. External URLs are
-scheme-validated and rendered as outbound links. Record images remain links unless
-item-specific reuse rights are known. P1034 model URLs are validated as outbound
-links. Confirmed Heidelberg PLY files are fetched directly by the browser only
-after the reader activates the viewer; unsupported models remain source links.
+scheme-validated. Record images are loaded from external hosts only after a visitor
+selects one in the zoom viewer; the original source link and rights notice remain
+visible. IIIF manifests are read in the browser when their hosts permit CORS.
+P1034 model URLs are validated as outbound links. Confirmed Heidelberg PLY files
+are fetched directly by the browser only after the reader activates the viewer;
+unsupported models remain source links.
 
 ## Simplicity review — 29 September 2026
 

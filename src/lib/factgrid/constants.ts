@@ -28,6 +28,8 @@ export const FACTGRID_PROPERTIES = Object.freeze({
   onlineDigitization: "P138",
   onlineInformation: "P146",
   onlineImage: "P188",
+  imageSide: "P1029",
+  mediaType: "P15",
   commonsImage: "P189",
   documentPage: "P251",
   containsDocumentsOf: "P324",
