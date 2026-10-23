@@ -195,3 +195,22 @@ test("plain Transcript-section poems remain readable", async ({ page }) => {
     await page.locator("html").evaluate((element) => element.scrollWidth <= element.clientWidth),
   ).toBe(true);
 });
+
+test("Unicode editions offer a font choice in the edition and comparison views", async ({ page }) => {
+  await page.goto("/tablets/Q9000002");
+
+  await page.locator("#edition-4 summary").click();
+
+  const edition = page.getByRole("combobox", { name: "Cuneiform font for Unicode edition" });
+  await expect(edition).toHaveValue("automatic");
+  await expect(edition.locator("option:checked")).toHaveText("Automatic (Noto Sans Cuneiform)");
+  await edition.selectOption("old-babylonian");
+  await expect(edition.locator("..").locator("..").locator("pre")).toHaveAttribute("data-unicode-font", "old-babylonian");
+
+  const unicodeOption = await page.locator("#comparison-left option").filter({ hasText: "Cuneiform Unicode" }).getAttribute("value");
+  expect(unicodeOption).not.toBeNull();
+  await page.locator("#comparison-left").selectOption(unicodeOption!);
+  const comparison = page.getByRole("combobox", { name: "Cuneiform font for left comparison" });
+  await comparison.selectOption("neo-assyrian");
+  await expect(comparison.locator("..").locator("..").locator("pre")).toHaveAttribute("data-unicode-font", "neo-assyrian");
+});
