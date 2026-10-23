@@ -68,15 +68,19 @@ revalidates membership through current entity claims.
 
 Global grouped and `SELECT DISTINCT` facet scans proved too expensive for an
 interactive request—even a result limit did not bound scan work. The runtime
-therefore forms contextual choices from P329/P695/P853 values on the current
-result page. A selected QID is still applied in CirrusSearch together with
-`P2=Q512006` before pagination; it is never a local post-filter.
+shows contextual P329/P695/P853 choices from the current result page and offers
+a bounded, on-demand English/German FactGrid entity-name search for values outside that page.
+Search matches are entity candidates, so some may have no matching tablets. A
+selected QID is still applied in CirrusSearch together with `P2=Q512006` before
+pagination; it is never a local post-filter.
 
 ## Representative records
 
 These are test cases for behavior, not hard-coded product content:
 
 - `Q892185`: sparse metadata and no transcript;
+- `Q894307`: P329 `Q21880` (Friedrich-Schiller-University Jena) and P853
+  `Q512148` (Ur III Period), checked read-only on 23 October 2026;
 - `Q893955`: multiple image links and no transcript;
 - `Q1089841`: one simple `D-Q…` document-page candidate;
 - `Q499899`: multiple distinct D/CDLI/ORACC/Unicode editions;
@@ -150,11 +154,12 @@ P188 does not reliably encode item-specific reuse rights. A visitor can choose t
 load an image directly from its source in the record's zoom viewer; the application
 does not proxy or store it. Source links remain visible and viewing does not grant
 reuse rights. IIIF Image API URLs use tiles when their `info.json` supports CORS;
-the viewer falls back to the source image otherwise. Presentation 2 and 3 manifest
+the viewer falls back to the source image if metadata or tile loading fails.
+Presentation 2 and 3 manifest
 URLs can expose multiple canvases when the host allows cross-origin manifest reads.
 Image annotation overlays are not yet exposed; no FactGrid annotation-link property
-has been identified for these records.
-The few P189 Commons values can provide stronger provenance, but each file still
+has been identified for these records. The few P189 Commons values can provide
+stronger provenance, but each file still
 requires its own license check. The homepage uses one separately verified Commons
 photograph with visible attribution.
 

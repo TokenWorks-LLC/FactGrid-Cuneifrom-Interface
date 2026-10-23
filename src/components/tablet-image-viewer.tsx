@@ -78,16 +78,26 @@ export function TabletImageViewer({ images }: { images: TabletImage[] }) {
         crossOriginPolicy: false,
       });
       viewer.current = instance;
-      instance.addHandler("open", () => setMessage(attemptedFallback ? "Tiled view is unavailable; showing the source image." : ""));
-      instance.addHandler("open-failed", () => {
+      let activeTiledImage: import("openseadragon").TiledImage | undefined;
+      const handleLoadFailure = () => {
         if (page.fallbackUrl && !attemptedFallback) {
           attemptedFallback = true;
+          activeTiledImage = undefined;
           // OpenSeadragon accepts inline image sources; its bundled open() type omits this form.
           instance?.open({ type: "image", url: page.fallbackUrl, buildPyramid: false } as unknown as Parameters<import("openseadragon").Viewer["open"]>[0]);
           setMessage("Tiled view is unavailable; showing the source image.");
         } else {
           setMessage("This image could not be displayed here. Open it at the source instead.");
         }
+      };
+      instance.addHandler("open", () => {
+        activeTiledImage = instance?.world.getItemAt(0);
+        setMessage(attemptedFallback ? "Tiled view is unavailable; showing the source image." : "");
+      });
+      instance.addHandler("open-failed", handleLoadFailure);
+      instance.addHandler("tile-load-failed", (event) => {
+        if (!event.maxReached || event.tiledImage !== activeTiledImage) return;
+        handleLoadFailure();
       });
     }).catch(() => setMessage("The image viewer could not load."));
     return () => {

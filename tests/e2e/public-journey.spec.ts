@@ -161,6 +161,31 @@ test("catalogue search opens a multi-edition tablet", async ({ page }) => {
   await expect(page.locator("#comparison-left + pre")).toContainText("PTEST002:obverse.1.1");
 });
 
+test("facet search finds holding and period values outside the current results page", async ({ page }) => {
+  await page.goto("/browse?q=Prag+I+437");
+  const collection = page.getByLabel("Collection / holding", { exact: true });
+  await expect(collection.locator('option:has-text("University of Jena")')).toHaveCount(0);
+
+  await page.getByLabel("Find more holdings by name").fill("University of Jena");
+  await expect(collection.locator('option[value="Q21880"]')).toHaveText("Friedrich-Schiller-University Jena (Q21880)");
+  await collection.selectOption("Q21880");
+  await page.getByRole("button", { name: "Apply search" }).click();
+  await expect(page).toHaveURL(/collection=Q21880/);
+  await expect(collection).toHaveValue("Q21880");
+  await expect(page.getByRole("link", { name: "TEST FIXTURE — Jena tablet", exact: true })).toBeVisible();
+
+  await page.goto("/browse?q=Prag+I+437");
+  const period = page.getByLabel("Period / style", { exact: true });
+  await expect(period.locator('option:has-text("Ur III Period")')).toHaveCount(0);
+  await page.getByLabel("Find more periods by name").fill("Ur III Period");
+  await expect(period.locator('option[value="Q512148"]')).toHaveText("Ur III Period (Q512148)");
+  await period.selectOption("Q512148");
+  await page.getByRole("button", { name: "Apply search" }).click();
+  await expect(page).toHaveURL(/period=Q512148/);
+  await expect(period).toHaveValue("Q512148");
+  await expect(page.getByRole("link", { name: "TEST FIXTURE — Jena tablet", exact: true })).toBeVisible();
+});
+
 test("plain Transcript-section poems remain readable", async ({ page }) => {
   await page.goto("/tablets/Q9000002");
 
@@ -200,4 +225,72 @@ test("image viewer loads a IIIF manifest on demand and shows image qualifiers", 
   await expect.poll(() => externalRequests).toBeGreaterThan(1);
   await expect(page.getByText("Loading image…")).toBeHidden();
   await expect(page.locator('[aria-label="Image 1 zoom viewer"] canvas').first()).toBeVisible();
+});
+
+test("image viewer falls back when IIIF tiles fail after info.json opens", async ({ page }) => {
+  let failedTiles = 0;
+  let fallbackRequests = 0;
+  const png = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVQIHWP4z8DwHwAFgAI/ScL/nwAAAABJRU5ErkJggg==", "base64");
+  await page.route("https://images.example.test/**", async (route) => {
+    const url = route.request().url();
+    if (url.endsWith("/iiif/3/Q9000002")) {
+      await route.fulfill({
+        contentType: "application/json",
+        headers: { "Access-Control-Allow-Origin": "*" },
+        body: JSON.stringify({
+          type: "Manifest",
+          items: [{ items: [{ items: [{ motivation: "painting", body: {
+            id: "https://images.example.test/fallback.png",
+            service: [{ id: "https://images.example.test/iiif/image1" }],
+          } }] }] }],
+        }),
+      });
+    } else if (url.endsWith("/iiif/image1/info.json")) {
+      await route.fulfill({
+        contentType: "application/json",
+        headers: { "Access-Control-Allow-Origin": "*" },
+        body: JSON.stringify({
+          "@context": "http://iiif.io/api/image/2/context.json",
+          "@id": "https://images.example.test/iiif/image1",
+          protocol: "http://iiif.io/api/image",
+          width: 512,
+          height: 512,
+          profile: ["http://iiif.io/api/image/2/level2.json"],
+          tiles: [{ width: 256, scaleFactors: [1, 2] }],
+        }),
+      });
+    } else if (url.endsWith("/fallback.png")) {
+      fallbackRequests += 1;
+      await route.fulfill({ contentType: "image/png", body: png });
+    } else {
+      failedTiles += 1;
+      await route.fulfill({ status: 404, body: "Tile missing" });
+    }
+  });
+
+  await page.goto("/tablets/Q9000002");
+  await page.getByRole("button", { name: /Image 1 Top · 3D rendering/ }).click();
+  await expect.poll(() => failedTiles).toBeGreaterThan(0);
+  await expect.poll(() => fallbackRequests).toBeGreaterThan(0);
+  await expect(page.getByText("Tiled view is unavailable; showing the source image.")).toBeVisible();
+  await expect(page.locator('[aria-label="Image 1 zoom viewer"] canvas').first()).toBeVisible();
+});
+
+test("Unicode editions offer a font choice in the edition and comparison views", async ({ page }) => {
+  await page.goto("/tablets/Q9000002");
+
+  await page.locator("#edition-4 summary").click();
+
+  const edition = page.getByRole("combobox", { name: "Cuneiform font for Unicode edition" });
+  await expect(edition).toHaveValue("automatic");
+  await expect(edition.locator("option:checked")).toHaveText("Automatic (Noto Sans Cuneiform)");
+  await edition.selectOption("old-babylonian");
+  await expect(edition.locator("..").locator("..").locator("pre")).toHaveAttribute("data-unicode-font", "old-babylonian");
+
+  const unicodeOption = await page.locator("#comparison-left option").filter({ hasText: "Cuneiform Unicode" }).getAttribute("value");
+  expect(unicodeOption).not.toBeNull();
+  await page.locator("#comparison-left").selectOption(unicodeOption!);
+  const comparison = page.getByRole("combobox", { name: "Cuneiform font for left comparison" });
+  await comparison.selectOption("neo-assyrian");
+  await expect(comparison.locator("..").locator("..").locator("pre")).toHaveAttribute("data-unicode-font", "neo-assyrian");
 });
