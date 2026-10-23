@@ -5,6 +5,7 @@ import { ArrowLeft, ArrowRight, ExternalLink, Search } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { FacetSelect } from "./facet-select";
 import type { LabeledEntity, TabletSearchPage } from "@/lib/factgrid";
 import { searchTablets } from "@/lib/factgrid/server";
 import { cn } from "@/lib/utils";
@@ -22,14 +23,6 @@ type BrowseSearchParams = Promise<
 
 function first(value: string | string[] | undefined): string {
   return typeof value === "string" ? value : (value?.[0] ?? "");
-}
-
-function selectOptions(options: LabeledEntity[]) {
-  return options.map((option) => (
-    <option key={option.id} value={option.id}>
-      {option.label} ({option.id})
-    </option>
-  ));
 }
 
 function pageUrl(values: Record<string, string>, page: number): string {
@@ -123,26 +116,32 @@ export default async function BrowsePage({ searchParams }: { searchParams: Brows
               </div>
 
               <FacetSelect
+                key={`collection-${values.collection}`}
                 label="Collection / holding"
+                searchLabel="Find more holdings by name"
                 name="collection"
                 options={facets.collections}
                 value={values.collection}
               />
               <FacetSelect
+                key={`findspot-${values.findspot}`}
                 label="Finding spot"
+                searchLabel="Find more finding spots by name"
                 name="findspot"
                 options={facets.findspots}
                 value={values.findspot}
               />
               <FacetSelect
+                key={`period-${values.period}`}
                 label="Period / style"
+                searchLabel="Find more periods by name"
                 name="period"
                 options={facets.periods}
                 value={values.period}
               />
               <p className="text-xs leading-5 text-muted-foreground">
-                Filter choices reflect values on this results page. FactGrid applies a selected
-                value to the catalogue before pagination.
+                Choices from this results page appear first. Search FactGrid by name for more;
+                choose a matching entity above, then apply the search. Some entities may have no matching tablets.
               </p>
 
               <div className="flex flex-wrap gap-2">
@@ -263,36 +262,6 @@ export default async function BrowsePage({ searchParams }: { searchParams: Brows
         </section>
       </div>
     </main>
-  );
-}
-
-function FacetSelect({
-  label,
-  name,
-  options,
-  value,
-}: {
-  label: string;
-  name: string;
-  options: LabeledEntity[];
-  value: string;
-}) {
-  return (
-    <div>
-      <label className="text-sm font-medium" htmlFor={`facet-${name}`}>
-        {label}
-      </label>
-      <select
-        className="mt-2 min-h-11 w-full border border-input bg-background px-3 text-sm"
-        defaultValue={value}
-        disabled={options.length === 0}
-        id={`facet-${name}`}
-        name={name}
-      >
-        <option value="">Any</option>
-        {selectOptions(options)}
-      </select>
-    </div>
   );
 }
 

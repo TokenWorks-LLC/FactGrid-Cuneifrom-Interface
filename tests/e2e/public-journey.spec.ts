@@ -161,6 +161,31 @@ test("catalogue search opens a multi-edition tablet", async ({ page }) => {
   await expect(page.locator("#comparison-left + pre")).toContainText("PTEST002:obverse.1.1");
 });
 
+test("facet search finds holding and period values outside the current results page", async ({ page }) => {
+  await page.goto("/browse?q=Prag+I+437");
+  const collection = page.getByLabel("Collection / holding", { exact: true });
+  await expect(collection.locator('option:has-text("University of Jena")')).toHaveCount(0);
+
+  await page.getByLabel("Find more holdings by name").fill("University of Jena");
+  await expect(collection.locator('option[value="Q21880"]')).toHaveText("Friedrich-Schiller-University Jena (Q21880)");
+  await collection.selectOption("Q21880");
+  await page.getByRole("button", { name: "Apply search" }).click();
+  await expect(page).toHaveURL(/collection=Q21880/);
+  await expect(collection).toHaveValue("Q21880");
+  await expect(page.getByRole("link", { name: "TEST FIXTURE — Jena tablet", exact: true })).toBeVisible();
+
+  await page.goto("/browse?q=Prag+I+437");
+  const period = page.getByLabel("Period / style", { exact: true });
+  await expect(period.locator('option:has-text("Ur III Period")')).toHaveCount(0);
+  await page.getByLabel("Find more periods by name").fill("Ur III Period");
+  await expect(period.locator('option[value="Q512148"]')).toHaveText("Ur III Period (Q512148)");
+  await period.selectOption("Q512148");
+  await page.getByRole("button", { name: "Apply search" }).click();
+  await expect(page).toHaveURL(/period=Q512148/);
+  await expect(period).toHaveValue("Q512148");
+  await expect(page.getByRole("link", { name: "TEST FIXTURE — Jena tablet", exact: true })).toBeVisible();
+});
+
 test("plain Transcript-section poems remain readable", async ({ page }) => {
   await page.goto("/tablets/Q9000002");
 
