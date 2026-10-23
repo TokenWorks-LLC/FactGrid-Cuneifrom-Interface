@@ -8,7 +8,7 @@ import { EditionComparison } from "@/components/edition-comparison";
 import { EditionEditGate } from "@/components/edition-edit-gate";
 import { Badge } from "@/components/ui/badge";
 import { isEditTargetEnabled, parseAllowedEditTargets } from "@/lib/edit/targets";
-import { FactGridNotFoundError, type LabeledEntity, type TabletEdition } from "@/lib/factgrid";
+import { FactGridNotFoundError, type LabeledEntity, type QuantityValue, type SourceLink, type TabletEdition } from "@/lib/factgrid";
 import { getTablet } from "@/lib/factgrid/server";
 import { wikitextToPlainText } from "@/lib/wikitext-display";
 
@@ -110,6 +110,8 @@ export default async function TabletPage({ params }: TabletPageProps) {
             <MetadataRow label="FactGrid ID" values={[tablet.qid]} mono />
             <MetadataRow label="Inventory number" values={tablet.inventoryNumbers} />
             <MetadataRow label="CDLI ID" values={tablet.cdliIds} mono />
+            <MetadataLinks label="DOI" values={tablet.dois} />
+            <MetadataLinks label="Wikidata" values={tablet.wikidataItems} />
             <MetadataEntities label="Collection / holding" values={tablet.holdings} />
             <MetadataEntities label="Finding spot" values={tablet.findspots} />
             <MetadataEntities label="Period / style" values={tablet.periods} />
@@ -123,6 +125,10 @@ export default async function TabletPage({ params }: TabletPageProps) {
                   `${dimension.kind}: ${dimension.amount}${dimension.unit ? ` ${dimension.unit.label}` : ""}`,
               )}
             />
+            <MetadataQuantities label="Surface area" values={tablet.surfaceAreas} />
+            <MetadataQuantities label="Volume" values={tablet.volumes} />
+            <MetadataLinks label="Online digitization" values={tablet.onlineDigitizations} />
+            <MetadataLinks label="External 3D model" values={tablet.external3dModels} />
           </dl>
 
           <div className="mt-9">
@@ -273,6 +279,28 @@ function MetadataEntities({ label, values }: { label: string; values: LabeledEnt
               </span>
             ))
           : "Not recorded in FactGrid"}
+      </dd>
+    </div>
+  );
+}
+
+function MetadataQuantities({ label, values }: { label: string; values: QuantityValue[] }) {
+  return <MetadataRow label={label} values={values.map((value) =>
+    `${value.amount}${value.unit ? ` ${value.unit.label}` : ""}`
+  )} />;
+}
+
+function MetadataLinks({ label, values }: { label: string; values: SourceLink[] }) {
+  return (
+    <div className="py-3.5">
+      <dt className="text-xs font-medium text-muted-foreground">{label}</dt>
+      <dd className="mt-1 break-words text-sm">
+        {values.length > 0 ? values.map((value, index) => (
+          <span key={value.url}>
+            {index > 0 ? ", " : null}
+            <a className="focus-ring underline decoration-border underline-offset-4 hover:decoration-primary" href={value.url} rel="noreferrer" target="_blank">{value.label}</a>
+          </span>
+        )) : "Not recorded in FactGrid"}
       </dd>
     </div>
   );

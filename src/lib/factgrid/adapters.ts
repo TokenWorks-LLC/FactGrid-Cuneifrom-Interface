@@ -12,6 +12,7 @@ import type {
   LabeledEntity,
   MediaWikiPage,
   Qid,
+  QuantityValue,
   SourceLink,
   TabletEdition,
   TabletRecord,
@@ -136,9 +137,13 @@ function safePublicUrl(value: string): string | undefined {
 function sourceLinks(entity: WikibaseEntity): {
   images: SourceLink[];
   externalTranscripts: SourceLink[];
+  onlineDigitizations: SourceLink[];
+  external3dModels: SourceLink[];
 } {
   const images: SourceLink[] = [];
   const externalTranscripts: SourceLink[] = [];
+  const onlineDigitizations: SourceLink[] = [];
+  const external3dModels: SourceLink[] = [];
 
   for (const rawUrl of stringValues(entity, FACTGRID_PROPERTIES.onlineImage)) {
     const url = safePublicUrl(rawUrl);
@@ -167,10 +172,42 @@ function sourceLinks(entity: WikibaseEntity): {
     }
   }
 
+  for (const rawUrl of stringValues(entity, FACTGRID_PROPERTIES.onlineDigitization)) {
+    const url = safePublicUrl(rawUrl);
+    if (url) onlineDigitizations.push({ kind: "online-digitization", label: new URL(url).hostname, url });
+  }
+
+  for (const rawUrl of stringValues(entity, FACTGRID_PROPERTIES.external3dModel)) {
+    const url = safePublicUrl(rawUrl);
+    if (url) external3dModels.push({ kind: "external-3d-model", label: new URL(url).hostname, url });
+  }
+
   return {
     images: dedupeLinks(images),
     externalTranscripts: dedupeLinks(externalTranscripts),
+    onlineDigitizations: dedupeLinks(onlineDigitizations),
+    external3dModels: dedupeLinks(external3dModels),
   };
+}
+
+function identifierLinks(entity: WikibaseEntity): { dois: SourceLink[]; wikidataItems: SourceLink[] } {
+  const dois = stringValues(entity, FACTGRID_PROPERTIES.doi).flatMap((raw): SourceLink[] => {
+    const doi = raw.trim();
+    return /^10\.\d{4,9}\/\S+$/iu.test(doi) && doi.length <= 255
+      ? [{ kind: "doi", label: doi, url: `https://doi.org/${encodeURIComponent(doi).replace(/%2F/giu, "/")}` }]
+      : [];
+  });
+  const wikidataIds = [
+    ...stringValues(entity, FACTGRID_PROPERTIES.wikidataId),
+    entity.sitelinks?.wikidatawiki?.title ?? "",
+  ];
+  const wikidataItems = wikidataIds.flatMap((raw): SourceLink[] => {
+    const id = raw.trim().toUpperCase();
+    return /^Q[1-9]\d*$/u.test(id) && id.length <= 32
+      ? [{ kind: "wikidata-item", label: id, url: `https://www.wikidata.org/wiki/${id}` }]
+      : [];
+  });
+  return { dois: dedupeLinks(dois), wikidataItems: dedupeLinks(wikidataItems) };
 }
 
 function dedupeLinks(links: SourceLink[]): SourceLink[] {
@@ -182,31 +219,31 @@ function dedupeLinks(links: SourceLink[]): SourceLink[] {
   });
 }
 
-function dimensions(entity: WikibaseEntity, labels: LabelMap): DimensionValue[] {
-  const entries = Object.entries(FACTGRID_PROPERTIES.dimensions) as Array<
-    [DimensionValue["kind"], DimensionValue["property"]]
-  >;
-  const result: DimensionValue[] = [];
-
-  for (const [kind, property] of entries) {
-    for (const value of statementValues(entity, property)) {
-      if (!value || typeof value !== "object") continue;
-      const quantity = value as { amount?: unknown; unit?: unknown };
-      if (typeof quantity.amount !== "string" || !/^[+-]?(?:\d+(?:\.\d*)?|\.\d+)$/.test(quantity.amount)) {
-        continue;
-      }
-      let unit: LabeledEntity | undefined;
-      if (typeof quantity.unit === "string" && quantity.unit.startsWith(FACTGRID.entityBase)) {
-        try {
-          unit = labeledEntity(parseQid(quantity.unit.slice(FACTGRID.entityBase.length), "Unit QID"), labels);
-        } catch {
-          // Unknown units stay absent rather than becoming unsafe links.
-        }
-      }
-      result.push({ kind, property, amount: quantity.amount.replace(/^\+/, ""), unit });
+function quantities(entity: WikibaseEntity, property: QuantityValue["property"], labels: LabelMap): QuantityValue[] {
+  const result: QuantityValue[] = [];
+  for (const value of statementValues(entity, property)) {
+    if (!value || typeof value !== "object") continue;
+    const quantity = value as { amount?: unknown; unit?: unknown };
+    if (typeof quantity.amount !== "string" || !/^[+-]?(?:\d+(?:\.\d*)?|\.\d+)$/.test(quantity.amount)) {
+      continue;
     }
+    let unit: LabeledEntity | undefined;
+    if (typeof quantity.unit === "string" && quantity.unit.startsWith(FACTGRID.entityBase)) {
+      try {
+        unit = labeledEntity(parseQid(quantity.unit.slice(FACTGRID.entityBase.length), "Unit QID"), labels);
+      } catch {
+        // Unknown units stay absent rather than becoming unsafe links.
+      }
+    }
+    result.push({ property, amount: quantity.amount.replace(/^\+/, ""), unit });
   }
   return result;
+}
+
+function dimensions(entity: WikibaseEntity, labels: LabelMap): DimensionValue[] {
+  return (Object.entries(FACTGRID_PROPERTIES.dimensions) as Array<
+    [DimensionValue["kind"], DimensionValue["property"]]
+  >).flatMap(([kind, property]) => quantities(entity, property, labels).map((value) => ({ ...value, kind })));
 }
 
 export function entityIsCuneiformTablet(entity: WikibaseEntity): boolean {
@@ -226,7 +263,11 @@ export function collectReferencedQids(entity: WikibaseEntity): Qid[] {
   for (const property of properties) {
     for (const qid of entityQids(entity, property)) result.add(qid);
   }
-  for (const property of Object.values(FACTGRID_PROPERTIES.dimensions)) {
+  for (const property of [
+    ...Object.values(FACTGRID_PROPERTIES.dimensions),
+    FACTGRID_PROPERTIES.surfaceArea,
+    FACTGRID_PROPERTIES.volume,
+  ]) {
     for (const value of statementValues(entity, property)) {
       if (!value || typeof value !== "object") continue;
       const unit = (value as { unit?: unknown }).unit;
@@ -253,6 +294,7 @@ export function adaptTabletEntity(entity: WikibaseEntity, labels: LabelMap = {})
   const title = rawTitle ?? bestTerm(entity.labels) ?? qid;
   const description = bestTerm(entity.descriptions);
   const sources = sourceLinks(entity);
+  const identifiers = identifierLinks(entity);
   const holdingStatements = activeStatements(entity, FACTGRID_PROPERTIES.presentHolding);
   const documentStatements = activeStatements(entity, FACTGRID_PROPERTIES.documentPage).filter(
     (statement) => statementStringValue(statement) !== undefined,
@@ -291,6 +333,8 @@ export function adaptTabletEntity(entity: WikibaseEntity, labels: LabelMap = {})
     revisionId: entity.lastrevid,
     modified: entity.modified,
     cdliIds: [...new Set(stringValues(entity, FACTGRID_PROPERTIES.cdliId))],
+    dois: identifiers.dois,
+    wikidataItems: identifiers.wikidataItems,
     inventoryNumbers: [
       ...new Set(
         qualifierStringValues(holdingStatements, FACTGRID_PROPERTIES.inventoryNumber),
@@ -303,7 +347,11 @@ export function adaptTabletEntity(entity: WikibaseEntity, labels: LabelMap = {})
     workTypes: toLabels(FACTGRID_PROPERTIES.workType),
     materials: toLabels(FACTGRID_PROPERTIES.material),
     dimensions: dimensions(entity, labels),
+    surfaceAreas: quantities(entity, FACTGRID_PROPERTIES.surfaceArea, labels),
+    volumes: quantities(entity, FACTGRID_PROPERTIES.volume, labels),
     images: sources.images,
+    onlineDigitizations: sources.onlineDigitizations,
+    external3dModels: sources.external3dModels,
     externalTranscripts: sources.externalTranscripts,
     editions,
     omittedEditionCount: Math.max(0, documentStatements.length - selectedDocuments.length),

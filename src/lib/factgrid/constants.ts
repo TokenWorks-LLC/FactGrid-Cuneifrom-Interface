@@ -20,15 +20,21 @@ export const FACTGRID_PROPERTIES = Object.freeze({
     depth: "P61",
   }),
   onlineTranscript: "P69",
+  onlineDigitization: "P138",
   workType: "P121",
   onlineImage: "P188",
   commonsImage: "P189",
   documentPage: "P251",
   presentHolding: "P329",
   material: "P401",
+  doi: "P634",
   cdliId: "P692",
   findspot: "P695",
+  wikidataId: "P771",
   period: "P853",
+  surfaceArea: "P1020",
+  external3dModel: "P1034",
+  volume: "P1091",
 });
 
 export const FACTGRID_LIMITS = Object.freeze({

@@ -84,15 +84,18 @@ export interface TabletEdition {
   reason?: string;
 }
 
-export interface DimensionValue {
-  kind: "height" | "width" | "depth";
+export interface QuantityValue {
   property: PropertyId;
   amount: string;
   unit?: LabeledEntity;
 }
 
+export interface DimensionValue extends QuantityValue {
+  kind: "height" | "width" | "depth";
+}
+
 export interface SourceLink {
-  kind: "online-image" | "commons-image" | "external-transcript";
+  kind: "online-image" | "commons-image" | "external-transcript" | "online-digitization" | "external-3d-model" | "doi" | "wikidata-item";
   label: string;
   url: string;
 }
@@ -105,6 +108,8 @@ export interface TabletRecord {
   revisionId?: number;
   modified?: string;
   cdliIds: string[];
+  dois: SourceLink[];
+  wikidataItems: SourceLink[];
   inventoryNumbers: string[];
   holdings: LabeledEntity[];
   findspots: LabeledEntity[];
@@ -113,7 +118,11 @@ export interface TabletRecord {
   workTypes: LabeledEntity[];
   materials: LabeledEntity[];
   dimensions: DimensionValue[];
+  surfaceAreas: QuantityValue[];
+  volumes: QuantityValue[];
   images: SourceLink[];
+  onlineDigitizations: SourceLink[];
+  external3dModels: SourceLink[];
   externalTranscripts: SourceLink[];
   editions: TabletEdition[];
   omittedEditionCount: number;
