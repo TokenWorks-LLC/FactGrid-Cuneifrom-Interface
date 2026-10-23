@@ -53,6 +53,12 @@ export function normalizeSearchInput(input: SearchInput = {}): NormalizedSearchI
         : parseQid(input.findspot, "Findspot"),
     period:
       input.period === undefined ? undefined : parseQid(input.period, "Period"),
+    language:
+      input.language === undefined ? undefined : parseQid(input.language, "Language"),
+    workType:
+      input.workType === undefined ? undefined : parseQid(input.workType, "Type of work"),
+    material:
+      input.material === undefined ? undefined : parseQid(input.material, "Material"),
     page: boundedInteger(input.page, 1, 1, FACTGRID_LIMITS.maxPage, "Page"),
     pageSize: boundedInteger(
       input.pageSize,
