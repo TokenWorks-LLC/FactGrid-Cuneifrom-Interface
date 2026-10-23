@@ -32,6 +32,7 @@ describe("FactGrid entity adapters", () => {
     expect(record.editions).toEqual([]);
     expect(record.externalTranscripts).toEqual([]);
     expect(record.images).toEqual([]);
+    expect(record.models).toEqual([]);
   });
 
   it("classifies editions, preserves P251 IDs, and only links P69", () => {
@@ -74,6 +75,26 @@ describe("FactGrid entity adapters", () => {
     };
 
     expect(adaptTabletEntity(entity).inventoryNumbers).toEqual(["I 437"]);
+  });
+
+  it("offers verified Heidelberg PLY models in the viewer and keeps other safe models as links", () => {
+    const entity = entityFixture("entity-sparse-no-transcript.json").entities!.Q9000001;
+    entity.claims!.P1034 = [
+      "https://heidicon.ub.uni-heidelberg.de/eas/partitions/1/tablet.ply",
+      "https://example.org/tablet.glb",
+      "javascript:alert(1)",
+      "https://heidicon.ub.uni-heidelberg.de.evil.test/eas/tablet.ply",
+      "https://heidicon.ub.uni-heidelberg.de:8443/eas/tablet.ply",
+    ].map((value) => ({ mainsnak: { snaktype: "value", datavalue: { value } } }));
+
+    const record = adaptTabletEntity(entity);
+    expect(record.models).toEqual([
+      { url: "https://heidicon.ub.uni-heidelberg.de/eas/partitions/1/tablet.ply", viewable: true },
+      { url: "https://example.org/tablet.glb", viewable: false },
+      { url: "https://heidicon.ub.uni-heidelberg.de.evil.test/eas/tablet.ply", viewable: false },
+      { url: "https://heidicon.ub.uni-heidelberg.de:8443/eas/tablet.ply", viewable: false },
+    ]);
+    expect(record.external3dModels.map((source) => source.url)).toEqual(record.models.map((model) => model.url));
   });
 
   it("adapts additional identifiers, source links, and measured quantities", () => {

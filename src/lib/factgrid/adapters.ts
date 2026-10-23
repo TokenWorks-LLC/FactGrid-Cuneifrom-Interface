@@ -11,6 +11,7 @@ import type {
   DocumentRevision,
   LabeledEntity,
   MediaWikiPage,
+  ModelSource,
   Qid,
   QuantityValue,
   SourceLink,
@@ -136,12 +137,14 @@ function safePublicUrl(value: string): string | undefined {
 
 function sourceLinks(entity: WikibaseEntity): {
   images: SourceLink[];
+  models: ModelSource[];
   externalTranscripts: SourceLink[];
   onlineDigitizations: SourceLink[];
   external3dModels: SourceLink[];
   onlineInformation: SourceLink[];
 } {
   const images: SourceLink[] = [];
+  const models: ModelSource[] = [];
   const externalTranscripts: SourceLink[] = [];
   const onlineDigitizations: SourceLink[] = [];
   const external3dModels: SourceLink[] = [];
@@ -181,7 +184,20 @@ function sourceLinks(entity: WikibaseEntity): {
 
   for (const rawUrl of stringValues(entity, FACTGRID_PROPERTIES.external3dModel)) {
     const url = safePublicUrl(rawUrl);
-    if (url) external3dModels.push({ kind: "external-3d-model", label: new URL(url).hostname, url });
+    if (!url) continue;
+    const parsed = new URL(url);
+    external3dModels.push({ kind: "external-3d-model", label: parsed.hostname, url });
+    models.push({
+      url,
+      // The Heidelberg PLY collection is confirmed to support browser CORS.
+      // Other sources remain links until their format and CORS are verified.
+      viewable:
+        parsed.protocol === "https:" &&
+        parsed.hostname === "heidicon.ub.uni-heidelberg.de" &&
+        parsed.port === "" &&
+        parsed.pathname.startsWith("/eas/") &&
+        parsed.pathname.toLowerCase().endsWith(".ply"),
+    });
   }
 
   for (const rawUrl of stringValues(entity, FACTGRID_PROPERTIES.onlineInformation)) {
@@ -191,6 +207,7 @@ function sourceLinks(entity: WikibaseEntity): {
 
   return {
     images: dedupeLinks(images),
+    models: [...new Map(models.map((model) => [model.url, model])).values()],
     externalTranscripts: dedupeLinks(externalTranscripts),
     onlineDigitizations: dedupeLinks(onlineDigitizations),
     external3dModels: dedupeLinks(external3dModels),
@@ -375,6 +392,7 @@ export function adaptTabletEntity(entity: WikibaseEntity, labels: LabelMap = {})
     surfaceAreas: quantities(entity, FACTGRID_PROPERTIES.surfaceArea, labels),
     volumes: quantities(entity, FACTGRID_PROPERTIES.volume, labels),
     images: sources.images,
+    models: sources.models,
     onlineDigitizations: sources.onlineDigitizations,
     onlineInformation: sources.onlineInformation,
     external3dModels: sources.external3dModels,

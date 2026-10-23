@@ -106,6 +106,11 @@ export interface SourceLink {
   url: string;
 }
 
+export interface ModelSource {
+  url: string;
+  viewable: boolean;
+}
+
 export interface TabletRecord {
   qid: Qid;
   title: string;
@@ -133,6 +138,7 @@ export interface TabletRecord {
   surfaceAreas: QuantityValue[];
   volumes: QuantityValue[];
   images: SourceLink[];
+  models: ModelSource[];
   onlineDigitizations: SourceLink[];
   onlineInformation: SourceLink[];
   external3dModels: SourceLink[];

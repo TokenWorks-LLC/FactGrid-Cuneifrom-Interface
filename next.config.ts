@@ -28,7 +28,7 @@ const nextConfig: NextConfig = {
       "style-src 'self' 'unsafe-inline'",
       "img-src 'self' data: blob: https://commons.wikimedia.org https://thumb.wikimedia.org https://upload.wikimedia.org https://database.factgrid.de",
       "font-src 'self' data:",
-      `connect-src 'self'${process.env.NODE_ENV === "development" ? " ws: wss:" : ""}`,
+      `connect-src 'self' https://heidicon.ub.uni-heidelberg.de${process.env.NODE_ENV === "development" ? " ws: wss:" : ""}`,
       "object-src 'none'",
       "base-uri 'self'",
       "frame-ancestors 'none'",

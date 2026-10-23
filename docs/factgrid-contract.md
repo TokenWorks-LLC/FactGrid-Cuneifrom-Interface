@@ -61,6 +61,7 @@ revalidates membership through current entity claims.
 | P59, P60, P61 | Dimensions |
 | P188 | Online image URL |
 | P189 | Wikimedia Commons image |
+| P1034 | External 3D model URL; Heidelberg PLY files can be viewed on demand |
 | P69 | Online transcript; kept as an external link |
 | P251 | FactGrid document page; resolved as a separate edition |
 

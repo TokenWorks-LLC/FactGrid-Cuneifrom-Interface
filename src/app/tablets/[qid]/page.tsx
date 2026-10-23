@@ -6,6 +6,7 @@ import { ArrowLeft, ExternalLink, FileText, ImageIcon, LockKeyhole, PencilLine }
 
 import { EditionComparison } from "@/components/edition-comparison";
 import { EditionEditGate } from "@/components/edition-edit-gate";
+import { TabletModelViewer } from "@/components/tablet-model-viewer";
 import { UnicodeText } from "@/components/unicode-text";
 import { Badge } from "@/components/ui/badge";
 import { isEditTargetEnabled, parseAllowedEditTargets } from "@/lib/edit/targets";
@@ -173,6 +174,32 @@ export default async function TabletPage({ params }: TabletPageProps) {
         </aside>
 
         <div className="order-1 min-w-0 lg:order-2">
+          {tablet.models.length > 0 ? (
+            <section aria-labelledby="models-heading" className="mb-12 border-b border-border pb-10">
+              <h2 className="font-heading text-3xl font-medium" id="models-heading">3D models</h2>
+              <p className="mt-2 max-w-[68ch] text-sm leading-6 text-muted-foreground">
+                Models are supplied by external collections. The interactive viewer downloads a model only when you choose to load it.
+              </p>
+              <div className="mt-6 space-y-9">
+                {tablet.models.map((model, index) => (
+                  <div className="border-t border-border pt-5" key={model.url}>
+                    <div className="flex flex-wrap items-center justify-between gap-3">
+                      <h3 className="font-heading text-xl font-medium">Model {index + 1}</h3>
+                      <a className="focus-ring inline-flex min-h-11 items-center gap-2 text-sm font-semibold underline" href={model.url} rel="noreferrer" target="_blank">
+                        Open source model <ExternalLink aria-hidden="true" className="size-4" />
+                      </a>
+                    </div>
+                    {model.viewable ? (
+                      <TabletModelViewer title={tablet.title} url={model.url} />
+                    ) : (
+                      <p className="mt-3 text-sm text-muted-foreground">This model format or source is not yet supported in the interactive viewer.</p>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </section>
+          ) : null}
+
           <div className="flex flex-wrap items-end justify-between gap-4 border-b border-foreground/35 pb-4">
             <div>
               <h2 className="font-heading text-3xl font-medium">Texts and editions</h2>

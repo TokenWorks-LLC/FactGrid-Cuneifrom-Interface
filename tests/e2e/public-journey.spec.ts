@@ -196,6 +196,43 @@ test("plain Transcript-section poems remain readable", async ({ page }) => {
   ).toBe(true);
 });
 
+test("tablet model loads only on request and offers a reset control", async ({ page }) => {
+  let modelRequests = 0;
+  const header = Buffer.from([
+    "ply", "format binary_little_endian 1.0", "element vertex 3",
+    "property float x", "property float y", "property float z",
+    "property uchar red", "property uchar green", "property uchar blue",
+    "element face 1", "property list uchar int vertex_indices", "end_header", "",
+  ].join("\n"));
+  const binary = Buffer.alloc(3 * 15 + 13);
+  const vertices = [[0, 0, 0], [1, 0, 0], [0, 1, 0]];
+  vertices.forEach((vertex, index) => {
+    vertex.forEach((coordinate, axis) => binary.writeFloatLE(coordinate, index * 15 + axis * 4));
+    binary.fill(180, index * 15 + 12, index * 15 + 15);
+  });
+  binary.writeUInt8(3, 45);
+  [0, 1, 2].forEach((vertex, index) => binary.writeInt32LE(vertex, 46 + index * 4));
+  await page.route("https://heidicon.ub.uni-heidelberg.de/eas/fixture/tablet.ply", async (route) => {
+    modelRequests += 1;
+    await route.fulfill({
+      contentType: "application/x-ply",
+      headers: { "access-control-allow-origin": "*" },
+      body: Buffer.concat([header, binary]),
+    });
+  });
+
+  await page.goto("/tablets/Q9000001");
+  await expect(page.getByRole("heading", { name: "3D models" })).toBeVisible();
+  await expect(page.getByText("External 3D model", { exact: true }).locator("..").getByRole("link"))
+    .toHaveAttribute("href", "https://heidicon.ub.uni-heidelberg.de/eas/fixture/tablet.ply");
+  expect(modelRequests).toBe(0);
+  await page.getByRole("button", { name: "Load interactive 3D model" }).click();
+  await expect(page.getByRole("button", { name: "Reset view" })).toBeVisible();
+  await expect(page.getByRole("img", { name: /3D model of TEST FIXTURE/ })).toBeVisible();
+  expect(modelRequests).toBe(1);
+  await page.getByRole("button", { name: "Reset view" }).click();
+});
+
 test("record material opens a filtered overview and keeps its definition link", async ({ page }) => {
   await page.goto("/tablets/Q9000002");
   const clayLink = page.getByRole("link", { name: "TEST FIXTURE clay", exact: true });
