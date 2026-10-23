@@ -29,6 +29,28 @@ function catalogueEntity(qid: string) {
 }
 
 describe("FactGrid server search", () => {
+  it("looks up off-page facet entity names with a bounded FactGrid request", async () => {
+    const fetchMock = vi.fn(async (input: URL | RequestInfo, init?: RequestInit) => {
+      const url = new URL(String(input));
+      expect(url.searchParams.get("action")).toBe("wbsearchentities");
+      expect(url.searchParams.get("search")).toBe("University of Jena");
+      expect(url.searchParams.get("limit")).toBe("20");
+      expect(url.searchParams.get("type")).toBe("item");
+      expect(["en", "de"]).toContain(url.searchParams.get("language"));
+      expect(init?.cache).toBe("no-store");
+      return jsonResponse({ search: [{ id: "Q21880", label: "Friedrich-Schiller-University Jena" }] });
+    });
+    const client = createFactGridClient({ fetch: fetchMock as typeof fetch });
+
+    await expect(client.searchFacetEntities(" University of Jena ")).resolves.toEqual([{
+      id: "Q21880",
+      label: "Friedrich-Schiller-University Jena",
+      url: "https://database.factgrid.de/wiki/Item:Q21880",
+    }]);
+    await expect(client.searchFacetEntities("x")).rejects.toMatchObject({ code: "INVALID_INPUT" });
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+
   it("returns an empty page only for a valid empty upstream result", async () => {
     const fetchMock = vi.fn(async () => jsonResponse({ batchcomplete: true, query: { search: [] } }));
     const client = createFactGridClient({

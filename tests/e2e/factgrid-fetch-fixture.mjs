@@ -8,6 +8,12 @@ const tablet = JSON.parse(
 const sparseTablet = JSON.parse(
   readFileSync(join(fixtureRoot, "entity-sparse-no-transcript.json"), "utf8"),
 ).response.entities.Q9000001;
+const jenaTablet = JSON.parse(JSON.stringify(tablet).replaceAll("Q9000002", "Q894307"));
+jenaTablet.labels.en.value = "TEST FIXTURE — Jena tablet";
+jenaTablet.claims.P11[0].mainsnak.datavalue.value = "TEST FIXTURE — Jena tablet";
+jenaTablet.claims.P329[0].mainsnak.datavalue.value.id = "Q21880";
+jenaTablet.claims.P853[0].mainsnak.datavalue.value.id = "Q512148";
+delete jenaTablet.claims.P251;
 const linkedMissingTablet = JSON.parse(JSON.stringify(sparseTablet).replaceAll("Q9000001", "Q9000003"));
 linkedMissingTablet.id = "Q9000003";
 linkedMissingTablet.pageid = 9000003;
@@ -30,6 +36,8 @@ const labels = {
   Q9000100: "TEST FIXTURE collection",
   Q9000101: "TEST FIXTURE findspot",
   Q9000102: "TEST FIXTURE period",
+  Q512148: "Ur III Period",
+  Q21880: "Friedrich-Schiller-University Jena",
 };
 const relatedQids = new Set(Object.keys(labels));
 const documentTitles = new Set([
@@ -65,6 +73,7 @@ function json(value) {
 }
 
 function entity(qid) {
+  if (qid === "Q894307") return jenaTablet;
   if (qid === "Q9000002") return tablet;
   if (qid === "Q9000001") return sparseTablet;
   if (qid === "Q9000003") return linkedMissingTablet;
@@ -92,11 +101,30 @@ globalThis.fetch = async (input, init) => {
     throw new Error("FactGrid acceptance fixtures permit only anonymous GET requests.");
   }
 
+  if (url.searchParams.get("action") === "wbsearchentities") {
+    const term = url.searchParams.get("search");
+    if (!["University of Jena", "Ur III Period"].includes(term)) {
+      throw new Error("Unexpected facet entity search in acceptance fixture.");
+    }
+    assertParameters(url, {
+      action: "wbsearchentities", format: "json", language: url.searchParams.get("language"),
+      uselang: url.searchParams.get("language"),
+      type: "item", search: term, limit: "20",
+    });
+    if (!["en", "de"].includes(url.searchParams.get("language"))) {
+      throw new Error("Unexpected facet entity search language in acceptance fixture.");
+    }
+    const id = term === "University of Jena" ? "Q21880" : "Q512148";
+    return json({ search: [{ id, label: labels[id] }] });
+  }
+
   if (url.searchParams.get("list") === "search") {
     const expression = url.searchParams.get("srsearch") ?? "";
     const allowedExpressions = new Set([
       'haswbstatement:P2=Q512006 "Prag" "I" "437"',
       'haswbstatement:P2=Q512006 haswbstatement:P329=Q9000100 "TEST" "FIXTURE"',
+      'haswbstatement:P2=Q512006 haswbstatement:P329=Q21880 "Prag" "I" "437"',
+      'haswbstatement:P2=Q512006 haswbstatement:P853=Q512148 "Prag" "I" "437"',
     ]);
     if (!allowedExpressions.has(expression)) {
       throw new Error("Unexpected catalogue search expression in acceptance fixture.");
@@ -113,15 +141,16 @@ globalThis.fetch = async (input, init) => {
       sroffset: "0",
       srsort: "create_timestamp_asc",
     });
+    const offPage = expression.includes("Q21880") || expression.includes("Q512148");
     return json({
       batchcomplete: true,
-      query: { search: [{ ns: 120, pageid: 9000002, title: "Item:Q9000002" }] },
+      query: { search: [{ ns: 120, pageid: offPage ? 894307 : 9000002, title: `Item:${offPage ? "Q894307" : "Q9000002"}` }] },
     });
   }
 
   if (url.searchParams.get("action") === "wbgetentities") {
     const ids = (url.searchParams.get("ids") ?? "").split("|").filter(Boolean);
-    const tabletRequest = ids.length === 1 && ["Q9000001", "Q9000002", "Q9000003"].includes(ids[0]);
+    const tabletRequest = ids.length === 1 && ["Q9000001", "Q9000002", "Q9000003", "Q894307"].includes(ids[0]);
     const labelRequest = ids.length > 0 && ids.every((qid) => relatedQids.has(qid));
     if (!tabletRequest && !labelRequest) {
       throw new Error("Unexpected entity IDs in FactGrid acceptance fixture.");

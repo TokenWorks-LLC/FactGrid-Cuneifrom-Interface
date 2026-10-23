@@ -66,15 +66,19 @@ revalidates membership through current entity claims.
 
 Global grouped and `SELECT DISTINCT` facet scans proved too expensive for an
 interactive request—even a result limit did not bound scan work. The runtime
-therefore forms contextual choices from P329/P695/P853 values on the current
-result page. A selected QID is still applied in CirrusSearch together with
-`P2=Q512006` before pagination; it is never a local post-filter.
+shows contextual P329/P695/P853 choices from the current result page and offers
+a bounded, on-demand English/German FactGrid entity-name search for values outside that page.
+Search matches are entity candidates, so some may have no matching tablets. A
+selected QID is still applied in CirrusSearch together with `P2=Q512006` before
+pagination; it is never a local post-filter.
 
 ## Representative records
 
 These are test cases for behavior, not hard-coded product content:
 
 - `Q892185`: sparse metadata and no transcript;
+- `Q894307`: P329 `Q21880` (Friedrich-Schiller-University Jena) and P853
+  `Q512148` (Ur III Period), checked read-only on 23 October 2026;
 - `Q893955`: multiple image links and no transcript;
 - `Q1089841`: one simple `D-Q…` document-page candidate;
 - `Q499899`: multiple distinct D/CDLI/ORACC/Unicode editions;
