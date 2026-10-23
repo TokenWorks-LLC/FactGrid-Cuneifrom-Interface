@@ -258,7 +258,7 @@ export function createFactGridClient(options: FactGridClientOptions = {}) {
     });
   }
 
-  async function getEntities(qids: readonly Qid[]): Promise<Map<Qid, WikibaseEntity>> {
+  async function getEntities(qids: readonly Qid[], includeSitelinks = false): Promise<Map<Qid, WikibaseEntity>> {
     const uniqueQids = [...new Set(qids.map((qid) => parseQid(qid)))];
     const result = new Map<Qid, WikibaseEntity>();
 
@@ -268,7 +268,7 @@ export function createFactGridClient(options: FactGridClientOptions = {}) {
         action: "wbgetentities",
         format: "json",
         formatversion: "2",
-        props: "info|labels|descriptions|claims",
+        props: includeSitelinks ? "info|labels|descriptions|claims|sitelinks" : "info|labels|descriptions|claims",
         languages: "en|de",
         languagefallback: "1",
         ids: batch.join("|"),
@@ -453,7 +453,7 @@ export function createFactGridClient(options: FactGridClientOptions = {}) {
     readOptions: TabletReadOptions = {},
   ): Promise<TabletRecord> {
     const qid = parseQid(qidValue);
-    const entities = await getEntities([qid]);
+    const entities = await getEntities([qid], true);
     const entity = entities.get(qid);
     if (!entity || entity.missing) throw new FactGridNotFoundError(qid);
     if (!entityIsCuneiformTablet(entity)) throw new FactGridNotFoundError(qid, true);
