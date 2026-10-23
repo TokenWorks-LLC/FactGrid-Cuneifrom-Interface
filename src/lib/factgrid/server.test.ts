@@ -170,6 +170,33 @@ describe("FactGrid server search", () => {
 });
 
 describe("FactGrid document loading", () => {
+  it("requests and displays a Wikidata sitelink when no P771 claim exists", async () => {
+    const fetchMock = vi.fn(async (input: URL | RequestInfo) => {
+      const url = new URL(String(input));
+      const requestedSitelinks = url.searchParams.get("props")?.split("|").includes("sitelinks") ?? false;
+      return jsonResponse({
+        success: 1,
+        entities: {
+          Q9000003: {
+            ...catalogueEntity("Q9000003"),
+            ...(requestedSitelinks ? { sitelinks: { wikidatawiki: { title: "Q12345" } } } : {}),
+          },
+        },
+      });
+    });
+    const client = createFactGridClient({ fetch: fetchMock as typeof fetch, revalidateSeconds: false });
+
+    const tablet = await client.getTablet("Q9000003", { includeDocuments: false });
+
+    expect(tablet.wikidataItems).toEqual([{
+      kind: "wikidata-item",
+      label: "Q12345",
+      url: "https://www.wikidata.org/wiki/Q12345",
+    }]);
+    expect(new URL(String(fetchMock.mock.calls[0][0])).searchParams.get("props")).toContain("sitelinks");
+    expect(fetchMock).toHaveBeenCalledOnce();
+  });
+
   it.each([
     { name: "existing", page: { pageid: 42, ns: 0, title: "D-Q42" }, exists: true },
     { name: "missing", page: { ns: 0, title: "D-Q42", missing: true }, exists: false },

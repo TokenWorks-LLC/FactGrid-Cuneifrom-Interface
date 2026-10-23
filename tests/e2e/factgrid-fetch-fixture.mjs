@@ -33,6 +33,14 @@ linkedMissingTablet.claims.P251 = [{
     datavalue: { type: "string", value: "https://database.factgrid.de/wiki/D-Q9000003" },
   },
 }];
+sparseTablet.claims.P1034 = [{
+  id: "Q9000001$fixture-model",
+  rank: "normal",
+  mainsnak: {
+    property: "P1034", datatype: "url", snaktype: "value",
+    datavalue: { type: "string", value: "https://heidicon.ub.uni-heidelberg.de/eas/fixture/tablet.ply" },
+  },
+}];
 const revisions = JSON.parse(
   readFileSync(join(fixtureRoot, "document-revisions.json"), "utf8"),
 );
@@ -167,11 +175,16 @@ globalThis.fetch = async (input, init) => {
     if (!tabletRequest && !labelRequest) {
       throw new Error("Unexpected entity IDs in FactGrid acceptance fixture.");
     }
+    const baseProps = "info|labels|descriptions|claims";
+    const props = url.searchParams.get("props");
+    if (props !== baseProps && !(tabletRequest && props === `${baseProps}|sitelinks`)) {
+      throw new Error("Unexpected props in FactGrid fixture request.");
+    }
     assertParameters(url, {
       action: "wbgetentities",
       format: "json",
       formatversion: "2",
-      props: "info|labels|descriptions|claims",
+      props: undefined,
       languages: "en|de",
       languagefallback: "1",
       ids: ids.join("|"),

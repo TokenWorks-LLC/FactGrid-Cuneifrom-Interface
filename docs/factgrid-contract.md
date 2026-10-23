@@ -63,6 +63,7 @@ revalidates membership through current entity claims.
 | P1029 | Object's side qualifier on P188; shown per image |
 | P15 | Media type qualifier on P188; shown per image |
 | P189 | Wikimedia Commons image |
+| P1034 | External 3D model URL; Heidelberg PLY files can be viewed on demand |
 | P69 | Online transcript; kept as an external link |
 | P251 | FactGrid document page; resolved as a separate edition |
 

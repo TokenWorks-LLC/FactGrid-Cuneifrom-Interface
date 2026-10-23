@@ -159,6 +159,9 @@ sanitized plain text; raw MediaWiki HTML is never injected. External URLs are
 scheme-validated. Record images are loaded from external hosts only after a visitor
 selects one in the zoom viewer; the original source link and rights notice remain
 visible. IIIF manifests are read in the browser when their hosts permit CORS.
+P1034 model URLs are validated as outbound links. Confirmed Heidelberg PLY files
+are fetched directly by the browser only after the reader activates the viewer;
+unsupported models remain source links.
 
 ## Simplicity review — 29 September 2026
 

@@ -32,6 +32,7 @@ describe("FactGrid entity adapters", () => {
     expect(record.editions).toEqual([]);
     expect(record.externalTranscripts).toEqual([]);
     expect(record.images).toEqual([]);
+    expect(record.models).toEqual([]);
   });
 
   it("classifies editions, preserves P251 IDs, and only links P69", () => {
@@ -109,6 +110,87 @@ describe("FactGrid entity adapters", () => {
       expect.objectContaining({ url: "https://example.org/top.jpg", sides: [expect.objectContaining({ label: "Top" })], mediaTypes: [expect.objectContaining({ label: "3D rendering" })] }),
       expect.objectContaining({ url: "https://example.org/back.jpg", sides: [expect.objectContaining({ label: "Back" })], mediaTypes: [] }),
     ]);
+  });
+
+  it("offers verified Heidelberg PLY models in the viewer and keeps other safe models as links", () => {
+    const entity = entityFixture("entity-sparse-no-transcript.json").entities!.Q9000001;
+    entity.claims!.P1034 = [
+      "https://heidicon.ub.uni-heidelberg.de/eas/partitions/1/tablet.ply",
+      "https://example.org/tablet.glb",
+      "javascript:alert(1)",
+      "https://heidicon.ub.uni-heidelberg.de.evil.test/eas/tablet.ply",
+      "https://heidicon.ub.uni-heidelberg.de:8443/eas/tablet.ply",
+    ].map((value) => ({ mainsnak: { snaktype: "value", datavalue: { value } } }));
+
+    const record = adaptTabletEntity(entity);
+    expect(record.models).toEqual([
+      { url: "https://heidicon.ub.uni-heidelberg.de/eas/partitions/1/tablet.ply", viewable: true },
+      { url: "https://example.org/tablet.glb", viewable: false },
+      { url: "https://heidicon.ub.uni-heidelberg.de.evil.test/eas/tablet.ply", viewable: false },
+      { url: "https://heidicon.ub.uni-heidelberg.de:8443/eas/tablet.ply", viewable: false },
+    ]);
+    expect(record.external3dModels.map((source) => source.url)).toEqual(record.models.map((model) => model.url));
+  });
+
+  it("adapts additional identifiers, source links, and measured quantities", () => {
+    const entity = entityFixture("entity-sparse-no-transcript.json").entities!.Q9000001;
+    const stringClaim = (property: string, value: string, rank: "normal" | "deprecated" = "normal") => ({
+      rank,
+      mainsnak: { property, snaktype: "value", datavalue: { type: "string", value } },
+    });
+    const quantityClaim = (property: string, amount: string, unit: string) => ({
+      rank: "normal" as const,
+      mainsnak: { property, snaktype: "value", datavalue: { type: "quantity", value: { amount, unit } } },
+    });
+    const itemClaim = (property: string, id: string) => ({
+      rank: "normal" as const,
+      mainsnak: { property, snaktype: "value", datavalue: { type: "wikibase-entityid", value: { id } } },
+    });
+    entity.claims = {
+      ...entity.claims,
+      P64: [itemClaim("P64", "Q300")],
+      P21: [itemClaim("P21", "Q301")],
+      P27: [itemClaim("P27", "Q302")],
+      P324: [itemClaim("P324", "Q303")],
+      P33: [itemClaim("P33", "Q304")],
+      P634: [stringClaim("P634", "10.1234/tablet.1"), stringClaim("P634", "10.1234/old", "deprecated")],
+      P1085: [stringClaim("P1085", "12345"), stringClaim("P1085", "."), stringClaim("P1085", ".."), stringClaim("P1085", "../unsafe")],
+      P771: [stringClaim("P771", "q12345"), stringClaim("P771", "not a QID")],
+      P138: [stringClaim("P138", "https://library.example/tablet"), stringClaim("P138", "javascript:alert(1)")],
+      P146: [stringClaim("P146", "https://museum.example/info")],
+      P1034: [stringClaim("P1034", "https://models.example/tablet"), stringClaim("P1034", "https://user:password@models.example/private")],
+      P1020: [quantityClaim("P1020", "+12.5", "https://database.factgrid.de/entity/Q123")],
+      P1091: [quantityClaim("P1091", "+3", "https://database.factgrid.de/entity/Q456")],
+    };
+    entity.sitelinks = { wikidatawiki: { title: "Q12345" } };
+
+    const record = adaptTabletEntity(entity, { Q123: "square centimetres", Q456: "cubic centimetres", Q300: "Publication", Q301: "Author", Q302: "Addressee", Q303: "Archive", Q304: "Person" });
+
+    expect(record.oareIds).toEqual([{ kind: "oare-id", label: "12345", url: "https://oare.byu.edu/epigraphies/12345" }]);
+    expect(record.dois).toEqual([{ kind: "doi", label: "10.1234/tablet.1", url: "https://doi.org/10.1234/tablet.1" }]);
+    expect(record.wikidataItems).toEqual([{ kind: "wikidata-item", label: "Q12345", url: "https://www.wikidata.org/wiki/Q12345" }]);
+    expect(record.onlineDigitizations).toEqual([{ kind: "online-digitization", label: "library.example", url: "https://library.example/tablet" }]);
+    expect(record.onlineInformation).toEqual([{ kind: "online-information", label: "museum.example", url: "https://museum.example/info" }]);
+    expect(record.external3dModels).toEqual([{ kind: "external-3d-model", label: "models.example", url: "https://models.example/tablet" }]);
+    expect(record.publications[0].label).toBe("Publication");
+    expect(record.authors[0].label).toBe("Author");
+    expect(record.addressees[0].label).toBe("Addressee");
+    expect(record.documentGroups[0].label).toBe("Archive");
+    expect(record.mentionedPeople[0].label).toBe("Person");
+    expect(record.surfaceAreas).toEqual([{ property: "P1020", amount: "12.5", unit: { id: "Q123", label: "square centimetres", url: "https://database.factgrid.de/wiki/Item:Q123" } }]);
+    expect(record.volumes).toMatchObject([{ amount: "3", unit: { label: "cubic centimetres" } }]);
+    expect(collectReferencedQids(entity)).toEqual(expect.arrayContaining(["Q123", "Q456", "Q300", "Q301", "Q302", "Q303", "Q304"]));
+  });
+
+  it("prioritizes core metadata labels ahead of long people-mentioned lists", () => {
+    const entity = entityFixture("entity-multiple-editions.json").entities!.Q9000002;
+    entity.claims!.P33 = Array.from({ length: 260 }, (_, index) => ({
+      rank: "normal",
+      mainsnak: { property: "P33", snaktype: "value", datavalue: { type: "wikibase-entityid", value: { id: `Q${800000 + index}` } } },
+    }));
+
+    const requested = collectReferencedQids(entity).slice(0, 250);
+    expect(requested).toEqual(expect.arrayContaining(["Q9000100", "Q9000101", "Q9000102", "Q102135"]));
   });
 
   it("preserves a bounded provider-owned lower-case statement GUID", () => {
