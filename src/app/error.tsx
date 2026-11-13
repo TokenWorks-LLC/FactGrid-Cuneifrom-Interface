@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useTransition } from "react";
 import Link from "next/link";
 import { AlertTriangle, RotateCcw } from "lucide-react";
 
@@ -10,11 +10,12 @@ import { cn } from "@/lib/utils";
 
 export default function ErrorPage({
   error,
-  reset,
+  retry,
 }: {
   error: Error & { digest?: string };
-  reset: () => void;
+  retry: () => void;
 }) {
+  const [pending, startTransition] = useTransition();
   useEffect(() => {
     // Log the opaque Next digest only; upstream responses and credentials stay out.
     if (error.digest) console.error("Page failed", { digest: error.digest });
@@ -33,9 +34,9 @@ export default function ErrorPage({
           return to a public page.
         </p>
         <div className="mt-7 flex flex-wrap gap-3">
-          <Button className="min-h-11 rounded-none px-4" onClick={reset} type="button">
+          <Button className="min-h-11 rounded-none px-4" disabled={pending} onClick={() => startTransition(retry)} type="button">
             <RotateCcw aria-hidden="true" className="size-4" />
-            Try again
+            {pending ? "Trying again…" : "Try again"}
           </Button>
           <a
             className={cn(buttonVariants({ variant: "outline" }), "min-h-11 rounded-none px-4")}

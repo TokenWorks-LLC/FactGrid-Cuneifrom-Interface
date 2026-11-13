@@ -105,6 +105,37 @@ function isDirectlyInsideTranscriptSection(source: string, index: number): boole
 }
 
 /**
+ * CDLI ATF-L pages use one unmarked poem rather than the D-page RDFa/section
+ * convention. Recognize that verified container and the observed ATF header;
+ * retain its contents exactly. This is a read contract, never a write contract.
+ */
+function analyzeAtfSource(reference: DocumentReference, source: string): TranscriptRegion | null {
+  if (reference.title !== `CDLI-ATF-L-${reference.qid}`) return null;
+  const openings = Array.from(source.matchAll(/<poem\b[^>]*>/giu));
+  const closings = Array.from(source.matchAll(/<\/poem\s*>/giu));
+  if (openings.length !== 1 || closings.length !== 1) return null;
+  const opening = openings[0];
+  const closing = closings[0];
+  if (isInsideExcludedWikitextContext(source, opening.index)) return null;
+  const start = opening.index + opening[0].length;
+  const end = closing.index;
+  if (end < start) return null;
+  const content = source.slice(start, end);
+  if (!/^\s*&P[0-9]+(?:[ \t]*=[^\r\n]*)?[ \t]*(?:\r?\n|$)/u.test(content) ||
+      !/^[ \t]*#atf:[ \t]+[^\r\n]+/mu.test(content) ||
+      !/^[ \t]*@tablet[ \t]*\r?$/mu.test(content)) return null;
+  return {
+    format: "atf-v1",
+    content,
+    displayText: content,
+    editable: false,
+    start,
+    end,
+    reason: "ATF is displayed verbatim and remains read-only; a lossless write contract has not been established.",
+  };
+}
+
+/**
  * Finds one exact hasTransliteration poem boundary, or one unambiguous poem in
  * a Transcript/Transliteration section. A verified D page can be editable when
  * either marker identifies one plain region; every write still requires the
@@ -114,6 +145,8 @@ export function analyzeTranscriptSource(
   reference: DocumentReference,
   source: string,
 ): TranscriptRegion | null {
+  // Never fall through to the editable D-page convention for an ATF edition.
+  if (reference.kind === "atf") return analyzeAtfSource(reference, source);
   POEM_OPEN.lastIndex = 0;
   const allOpenings = Array.from(source.matchAll(POEM_OPEN));
   const eligibleOpenings = allOpenings.filter(

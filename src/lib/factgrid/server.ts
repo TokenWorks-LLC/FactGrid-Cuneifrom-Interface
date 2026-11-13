@@ -4,10 +4,12 @@ import {
   adaptDocumentRevision,
   adaptTabletEntity,
   collectReferencedQids,
-  entityIsCuneiformTablet,
 } from "./adapters";
 import { FACTGRID, FACTGRID_LIMITS } from "./constants";
 import { FactGridError, FactGridNotFoundError, isFactGridError } from "./errors";
+import { entityIsEditableTablet, entityIsReadableTablet } from "./eligibility";
+import { getCatalogueFacets, queryCatalogueIndex, type CatalogueIndex } from "./catalogue-index";
+import { loadCatalogueIndex } from "./catalogue-index.server";
 import type {
   EditableTabletEntity,
   MediaWikiPage,
@@ -16,8 +18,8 @@ import type {
   Qid,
   PropertyId,
   SearchInput,
-  SparqlResponse,
   TabletRecord,
+  TabletReadWarning,
   TabletEdition,
   TabletFacets,
   TabletSearchPage,
@@ -28,9 +30,7 @@ import type {
 import { normalizeSearchInput, parseEditionId, parseQid } from "./validation";
 import {
   adaptCirrusSearchQids,
-  adaptFacetQids,
   buildCirrusSearchExpression,
-  buildFacetQuery,
 } from "./search-query";
 
 type ServerFetch = typeof globalThis.fetch;
@@ -41,6 +41,8 @@ export interface FactGridClientOptions {
   maxResponseBytes?: number;
   /** Next.js public-data revalidation time. Set false for tests or uncached reads. */
   revalidateSeconds?: number | false;
+  /** Tests can inject a validated snapshot; false forces the live fallback. */
+  catalogueIndex?: CatalogueIndex | false;
 }
 
 export interface TabletReadOptions {
@@ -108,6 +110,8 @@ export function createFactGridClient(options: FactGridClientOptions = {}) {
   const timeoutMs = options.timeoutMs ?? FACTGRID_LIMITS.timeoutMs;
   const maxResponseBytes = options.maxResponseBytes ?? FACTGRID_LIMITS.maxResponseBytes;
   const revalidateSeconds = options.revalidateSeconds ?? 300;
+  const catalogueIndex = async () => options.catalogueIndex === false ? null :
+    options.catalogueIndex ?? (options.fetch ? null : loadCatalogueIndex());
 
   if (typeof fetchImpl !== "function") {
     throw new FactGridError("UPSTREAM_UNAVAILABLE", "Server fetch is unavailable.", {
@@ -219,7 +223,11 @@ export function createFactGridClient(options: FactGridClientOptions = {}) {
 
       const body = await boundedResponseText(response);
       try {
-        return JSON.parse(body) as T;
+        const parsed: unknown = JSON.parse(body);
+        if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+          throw new Error("Expected an API response object");
+        }
+        return parsed as T;
       } catch (cause) {
         throw new FactGridError(
           "UPSTREAM_PROTOCOL",
@@ -258,7 +266,7 @@ export function createFactGridClient(options: FactGridClientOptions = {}) {
     });
   }
 
-  async function getEntities(qids: readonly Qid[], includeSitelinks = false): Promise<Map<Qid, WikibaseEntity>> {
+  async function getEntities(qids: readonly Qid[], includeSitelinks = false, uncached = false): Promise<Map<Qid, WikibaseEntity>> {
     const uniqueQids = [...new Set(qids.map((qid) => parseQid(qid)))];
     const result = new Map<Qid, WikibaseEntity>();
 
@@ -272,7 +280,7 @@ export function createFactGridClient(options: FactGridClientOptions = {}) {
         languages: "en|de",
         languagefallback: "1",
         ids: batch.join("|"),
-      });
+      }, uncached ? { cache: "no-store" } : {});
       if (response.error || !response.entities) {
         throw new FactGridError(
           "UPSTREAM_PROTOCOL",
@@ -282,10 +290,10 @@ export function createFactGridClient(options: FactGridClientOptions = {}) {
       }
       for (const qid of batch) {
         const entity = response.entities[qid];
-        if (!entity) {
+        if (!entity || (!entity.missing && entity.id !== qid)) {
           throw new FactGridError(
             "UPSTREAM_PROTOCOL",
-            `FactGrid omitted ${qid} from its entity response.`,
+            `FactGrid omitted or misidentified ${qid} in its entity response.`,
             { status: 502, retryable: true },
           );
         }
@@ -318,8 +326,12 @@ export function createFactGridClient(options: FactGridClientOptions = {}) {
       { cache: "no-store" },
     );
     const entity = response.entities?.[qid];
-    if (response.error || !entity || entity.missing) throw new FactGridNotFoundError(qid);
-    if (requireCatalogueMembership && !entityIsCuneiformTablet(entity)) {
+    if (response.error || !entity) throw new FactGridError(
+      "UPSTREAM_PROTOCOL", response.error?.info ?? "FactGrid omitted the requested editable item.",
+      { status: 502, retryable: true },
+    );
+    if (entity.missing) throw new FactGridNotFoundError(qid);
+    if (requireCatalogueMembership && !entityIsEditableTablet(entity)) {
       throw new FactGridNotFoundError(qid, true);
     }
     if (
@@ -397,17 +409,44 @@ export function createFactGridClient(options: FactGridClientOptions = {}) {
     };
   }
 
-  async function labelsFor(entities: readonly WikibaseEntity[]): Promise<Map<string, string>> {
+  async function labelsFor(
+    entities: readonly WikibaseEntity[],
+    warnings?: TabletReadWarning[],
+  ): Promise<Map<string, string>> {
     const ids = new Set<Qid>();
     for (const entity of entities) {
       for (const qid of collectReferencedQids(entity)) ids.add(qid);
     }
     // Labels are presentation enhancements. Cap amplification from pathological
     // records; uncapped references still display their safe QIDs.
-    const related = await getEntities([...ids].slice(0, FACTGRID_LIMITS.maxRelatedQids));
     const labels = new Map<string, string>();
-    for (const [qid, entity] of related) labels.set(qid, labelForEntity(entity) ?? qid);
+    for (const batch of chunks([...ids].slice(0, FACTGRID_LIMITS.maxRelatedQids), FACTGRID_LIMITS.maxWbgetentitiesBatch)) {
+      try {
+        const related = await getEntities(batch, false, true);
+        for (const [qid, entity] of related) labels.set(qid, labelForEntity(entity) ?? qid);
+      } catch (error) {
+        if (!isFactGridError(error)) throw error;
+        // A label is optional presentation data. Preserve successful batches;
+        // unresolved relations retain their validated QIDs and source links.
+        if (!warnings?.length) warnings?.push({
+          resource: "labels",
+          code: error.code,
+          message: "Some related labels could not be retrieved. FactGrid identifiers are shown instead.",
+          retryable: error.retryable,
+        });
+      }
+    }
     return labels;
+  }
+
+  function failedEdition(edition: TabletEdition, error: FactGridError): TabletEdition {
+    return {
+      ...edition,
+      status: "error",
+      reason: error.message,
+      errorCode: error.code,
+      retryable: error.retryable,
+    };
   }
 
   async function loadDocumentPages(record: TabletRecord): Promise<TabletRecord> {
@@ -416,35 +455,62 @@ export function createFactGridClient(options: FactGridClientOptions = {}) {
     );
     if (references.length === 0) return record;
 
-    const response = await mediaWikiApi<MediaWikiQueryResponse>({
-      action: "query",
-      format: "json",
-      formatversion: "2",
-      prop: "revisions",
-      rvprop: "ids|timestamp|content|contentmodel",
-      rvslots: "main",
-      titles: references.map((reference) => reference.title).join("|"),
-    });
-    if (response.error || !Array.isArray(response.query?.pages)) {
-      throw new FactGridError(
-        "UPSTREAM_PROTOCOL",
-        response.error?.info ?? "FactGrid returned an invalid revision response.",
-        { status: 502, retryable: true },
-      );
+    let response: MediaWikiQueryResponse;
+    try {
+      response = await mediaWikiApi<MediaWikiQueryResponse>({
+        action: "query",
+        format: "json",
+        formatversion: "2",
+        prop: "revisions",
+        rvprop: "ids|timestamp|content|contentmodel",
+        rvslots: "main",
+        titles: [...new Set(references.map((reference) => reference.title))].join("|"),
+      }, { cache: "no-store" });
+      if (response.error || !Array.isArray(response.query?.pages)) {
+        throw new FactGridError(
+          "UPSTREAM_PROTOCOL",
+          response.error?.info ?? "FactGrid returned an invalid revision response.",
+          { status: 502, retryable: true },
+        );
+      }
+    } catch (error) {
+      if (!isFactGridError(error)) throw error;
+      return {
+        ...record,
+        editions: record.editions.map((edition) => edition.reference ? failedEdition(edition, error) : edition),
+      };
     }
 
     const pages = new Map<string, MediaWikiPage>();
-    for (const page of response.query.pages) {
-      if (typeof page.title === "string") pages.set(page.title.replaceAll("_", " "), page);
+    const duplicateTitles = new Set<string>();
+    for (const page of response.query?.pages ?? []) {
+      if (page && typeof page.title === "string") {
+        const title = page.title.replaceAll("_", " ");
+        if (pages.has(title)) duplicateTitles.add(title);
+        else pages.set(title, page);
+      }
     }
     return {
       ...record,
-      editions: record.editions.map((edition) =>
-        adaptDocumentRevision(
-          edition,
-          edition.reference ? pages.get(edition.reference.title) : undefined,
-        ),
-      ),
+      editions: record.editions.map((edition) => {
+        if (!edition.reference) return edition;
+        if (duplicateTitles.has(edition.reference.title)) return failedEdition(edition, new FactGridError(
+          "UPSTREAM_PROTOCOL", "FactGrid returned conflicting revisions for this edition.",
+          { status: 502, retryable: true },
+        ));
+        const page = pages.get(edition.reference.title);
+        if (!page) return failedEdition(edition, new FactGridError(
+          "UPSTREAM_PROTOCOL",
+          "FactGrid omitted this linked edition from its revision response.",
+          { status: 502, retryable: true },
+        ));
+        try {
+          return adaptDocumentRevision(edition, page);
+        } catch (error) {
+          if (!isFactGridError(error)) throw error;
+          return failedEdition(edition, error);
+        }
+      }),
     };
   }
 
@@ -456,10 +522,12 @@ export function createFactGridClient(options: FactGridClientOptions = {}) {
     const entities = await getEntities([qid], true);
     const entity = entities.get(qid);
     if (!entity || entity.missing) throw new FactGridNotFoundError(qid);
-    if (!entityIsCuneiformTablet(entity)) throw new FactGridNotFoundError(qid, true);
+    if (!entityIsReadableTablet(entity)) throw new FactGridNotFoundError(qid, true);
 
-    const labels = await labelsFor([entity]);
+    const readWarnings: TabletReadWarning[] = [];
+    const labels = await labelsFor([entity], readWarnings);
     const record = adaptTabletEntity(entity, labels);
+    if (readWarnings.length) record.readWarnings = readWarnings;
     return readOptions.includeDocuments === false ? record : loadDocumentPages(record);
   }
 
@@ -494,7 +562,18 @@ export function createFactGridClient(options: FactGridClientOptions = {}) {
     const qid = parseQid(qidValue);
     const editionId = parseEditionId(editionIdValue, qid);
     // This deliberately re-reads the item. A client-provided URL/title is never accepted.
-    const record = await getTablet(qid, { includeDocuments: false });
+    const response = await mediaWikiApi<WbGetEntitiesResponse>({
+      action: "wbgetentities", format: "json", formatversion: "2",
+      props: "info|labels|descriptions|claims", ids: qid,
+    }, { cache: "no-store" });
+    if (response.error || !response.entities?.[qid]) throw new FactGridError(
+      "UPSTREAM_PROTOCOL", "FactGrid returned invalid current edition metadata.", { status: 502, retryable: true },
+    );
+    const entity = response.entities[qid];
+    if (!entity || entity.missing) throw new FactGridNotFoundError(qid);
+    if (entity.id !== qid) throw new FactGridError("UPSTREAM_PROTOCOL", "FactGrid returned the wrong edition item.", { status: 502 });
+    if (!entityIsEditableTablet(entity)) throw new FactGridNotFoundError(qid, true);
+    const record = adaptTabletEntity(entity);
     const edition = record.editions.find(
       (candidate) => candidate.editionId === editionId && candidate.reference,
     );
@@ -510,6 +589,36 @@ export function createFactGridClient(options: FactGridClientOptions = {}) {
 
   async function searchTablets(input: SearchInput = {}): Promise<TabletSearchPage> {
     const normalized = normalizeSearchInput(input);
+    const index = await catalogueIndex();
+    if (index) {
+      const restarted = Boolean(normalized.catalogueVersion && normalized.catalogueVersion !== index.generatedAt);
+      const page = queryCatalogueIndex(index, restarted ? { ...normalized, page: 1 } : normalized);
+      const entityMap = await getEntities(page.qids);
+      const entities = page.qids.flatMap((qid) => {
+        const entity = entityMap.get(qid);
+        return entity && !entity.missing && entityIsReadableTablet(entity) ? [entity] : [];
+      });
+      const labels = await labelsFor(entities);
+      const records = entities.map((entity) => adaptTabletEntity(entity, labels)).filter((record) =>
+        (!normalized.collection || record.holdings.some((value) => value.id === normalized.collection)) &&
+        (!normalized.findspot || record.findspots.some((value) => value.id === normalized.findspot)) &&
+        (!normalized.period || record.periods.some((value) => value.id === normalized.period)) &&
+        (!normalized.language || record.languages.some((value) => value.id === normalized.language)) &&
+        (!normalized.workType || record.workTypes.some((value) => value.id === normalized.workType)) &&
+        (!normalized.material || record.materials.some((value) => value.id === normalized.material)),
+      );
+      return {
+        results: records,
+        page: page.page,
+        pageSize: page.pageSize,
+        hasNextPage: page.hasNextPage,
+        catalogue: { source: "snapshot", complete: true, generatedAt: index.generatedAt, totalResults: page.totalResults,
+          ...(restarted ? { restarted: true } : {}) },
+      };
+    }
+    if ((normalized.page - 1) * normalized.pageSize >= 10_000) {
+      throw new FactGridError("INVALID_INPUT", "Deep catalogue navigation requires a complete catalogue index. Narrow the search or ask the operator to refresh the index.", { status: 400 });
+    }
     const rawLimit = normalized.pageSize + 1;
     const response = await mediaWikiApi<MediaWikiSearchResponse>(
       {
@@ -542,6 +651,7 @@ export function createFactGridClient(options: FactGridClientOptions = {}) {
         page: normalized.page,
         pageSize: normalized.pageSize,
         hasNextPage: false,
+        ...(!options.fetch ? { catalogue: { source: "live-search" as const, complete: false } } : {}),
       };
     }
 
@@ -549,7 +659,7 @@ export function createFactGridClient(options: FactGridClientOptions = {}) {
     // CirrusSearch is an index. Revalidate the current, non-deprecated P2 claim.
     const validQids = search.qids.filter((qid) => {
       const entity = entityMap.get(qid);
-      return Boolean(entity && !entity.missing && entityIsCuneiformTablet(entity));
+      return Boolean(entity && !entity.missing && entityIsReadableTablet(entity));
     });
     // Preserve raw index boundaries across pages. A stale entry may leave a
     // temporary hole, but a look-ahead result must not be pulled into this page
@@ -580,6 +690,7 @@ export function createFactGridClient(options: FactGridClientOptions = {}) {
       hasNextPage:
         search.hasContinuation ||
         validQids.includes(search.qids[normalized.pageSize]),
+      ...(!options.fetch ? { catalogue: { source: "live-search" as const, complete: false } } : {}),
     };
   }
 
@@ -641,42 +752,10 @@ export function createFactGridClient(options: FactGridClientOptions = {}) {
     return [...results.values()];
   }
 
-  async function facetQids(property: "P329" | "P695" | "P853"): Promise<Qid[]> {
-    const query = buildFacetQuery(property);
-    const response = await requestJson<SparqlResponse>(new URL(FACTGRID.sparql), {
-      method: "POST",
-      headers: {
-        Accept: "application/sparql-results+json",
-        "Content-Type": "application/x-www-form-urlencoded;charset=UTF-8",
-      },
-      body: new URLSearchParams({ query }),
-    });
-    return adaptFacetQids(response);
-  }
-
   async function getTabletFacets(): Promise<TabletFacets> {
-    const [collections, findspots, periods] = await Promise.all([
-      facetQids("P329"),
-      facetQids("P695"),
-      facetQids("P853"),
-    ]);
-    const ids = [...new Set([...collections, ...findspots, ...periods])];
-    const entities = await getEntities(ids);
-    const collator = new Intl.Collator("en", { numeric: true, sensitivity: "base" });
-    const mapValues = (values: Qid[]) =>
-      values
-        .map((id) => ({
-          id,
-          label: labelForEntity(entities.get(id) ?? {}) ?? id,
-          url: `${FACTGRID.wikiBase}Item:${id}`,
-        }))
-        .sort((left, right) => collator.compare(left.label, right.label) || left.id.localeCompare(right.id));
-
-    return {
-      collections: mapValues(collections),
-      findspots: mapValues(findspots),
-      periods: mapValues(periods),
-    };
+    const index = await catalogueIndex();
+    if (index) return getCatalogueFacets(index);
+    throw new FactGridError("UPSTREAM_UNAVAILABLE", "Catalogue-wide facets require a complete discovery index.", { status: 503 });
   }
 
   return Object.freeze({

@@ -2,6 +2,11 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
 const fixtureRoot = join(process.cwd(), "tests", "fixtures", "factgrid");
+// Deterministic, explicitly synthetic discovery data. Never use the operator's
+// live index in acceptance tests; source reads below remain fail-closed.
+process.env.FACTGRID_CATALOGUE_INDEX = join(fixtureRoot, "catalogue-index.json");
+const hs751 = JSON.parse(readFileSync(join(fixtureRoot, "live-q894483-entity.json"), "utf8")).entities.Q894483;
+const hs751Document = JSON.parse(readFileSync(join(fixtureRoot, "live-q894483-document.json"), "utf8"));
 const tablet = JSON.parse(
   readFileSync(join(fixtureRoot, "entity-multiple-editions.json"), "utf8"),
 ).response.entities.Q9000002;
@@ -44,6 +49,25 @@ sparseTablet.claims.P1034 = [{
 const revisions = JSON.parse(
   readFileSync(join(fixtureRoot, "document-revisions.json"), "utf8"),
 );
+const partialTablet = JSON.parse(JSON.stringify(tablet).replaceAll("Q9000002", "Q9000004"));
+partialTablet.labels.en.value = "TEST FIXTURE partial edition failure";
+partialTablet.claims.P11[0].mainsnak.datavalue.value = "TEST FIXTURE partial edition failure";
+const partialPages = JSON.parse(JSON.stringify(revisions.query.pages).replaceAll("Q9000002", "Q9000004"));
+partialPages.find((page) => page.title === "D-Q9000004").revisions = [];
+const paginationTablets = new Map(Array.from({ length: 25 }, (_, index) => {
+  const id = `Q${9100001 + index}`;
+  const item = JSON.parse(JSON.stringify(sparseTablet).replaceAll("Q9000001", id));
+  delete item.claims.P1034;
+  item.id = id;
+  item.labels.en.value = `TEST FIXTURE PaginationFixture ${index + 1}`;
+  item.claims.P11[0].mainsnak.datavalue.value = item.labels.en.value;
+  const itemStatement = (qid) => ({ rank: "normal", mainsnak: { snaktype: "value", datavalue: { value: { id: qid } } } });
+  item.claims.P329 = [itemStatement("Q9200001")];
+  if (index === 24) item.claims.P329.push(...Array.from({ length: 60 }, (_, n) => itemStatement(`Q${9300001 + n}`)));
+  item.claims.P695 = index === 24 ? [itemStatement("Q9200002")] : [];
+  item.claims.P853 = index === 24 ? [itemStatement("Q9200003")] : [];
+  return [id, item];
+}));
 const originalFetch = globalThis.fetch.bind(globalThis);
 
 const labels = {
@@ -57,8 +81,21 @@ const labels = {
   Q9000103: "TEST FIXTURE clay",
   Q512148: "Ur III Period",
   Q21880: "Friedrich-Schiller-University Jena",
+  Q390017: "TEST FIXTURE HS 751 findspot",
+  Q512142: "TEST FIXTURE HS 751 period",
+  Q471149: "TEST FIXTURE Sumerian",
+  Q9200001: "TEST FIXTURE pagination collection",
+  Q9200002: "TEST FIXTURE distant findspot",
+  Q9200003: "TEST FIXTURE distant period",
+  ...Object.fromEntries(Array.from({ length: 60 }, (_, index) => [`Q${9300001 + index}`, `TEST FIXTURE holding ${String(index + 1).padStart(3, "0")}`])),
 };
 const relatedQids = new Set(Object.keys(labels));
+function collectFixtureIds(value) {
+  if (!value || typeof value !== "object") return;
+  if (typeof value.id === "string" && /^Q[1-9][0-9]*$/u.test(value.id)) relatedQids.add(value.id);
+  for (const nested of Object.values(value)) collectFixtureIds(nested);
+}
+collectFixtureIds(hs751.claims);
 const documentTitles = new Set([
   "D-Q9000002",
   "CDLI-W-Q9000002",
@@ -92,10 +129,14 @@ function json(value) {
 }
 
 function entity(qid) {
+  if (qid === "Q894483") return hs751;
   if (qid === "Q894307") return jenaTablet;
   if (qid === "Q9000002") return tablet;
   if (qid === "Q9000001") return sparseTablet;
   if (qid === "Q9000003") return linkedMissingTablet;
+  if (qid === "Q9000004") return partialTablet;
+  if (paginationTablets.has(qid)) return paginationTablets.get(qid);
+  if (qid === "Q9999998") return { id: qid, missing: true };
   return {
     id: qid,
     labels: { en: { language: "en", value: labels[qid] ?? qid } },
@@ -170,7 +211,8 @@ globalThis.fetch = async (input, init) => {
 
   if (url.searchParams.get("action") === "wbgetentities") {
     const ids = (url.searchParams.get("ids") ?? "").split("|").filter(Boolean);
-    const tabletRequest = ids.length === 1 && ["Q9000001", "Q9000002", "Q9000003", "Q894307"].includes(ids[0]);
+    const tabletIds = new Set(["Q9000001", "Q9000002", "Q9000003", "Q9000004", "Q894307", "Q894483", "Q9999998", "Q9999999", ...paginationTablets.keys()]);
+    const tabletRequest = ids.length > 0 && ids.every((qid) => tabletIds.has(qid));
     const labelRequest = ids.length > 0 && ids.every((qid) => relatedQids.has(qid));
     if (!tabletRequest && !labelRequest) {
       throw new Error("Unexpected entity IDs in FactGrid acceptance fixture.");
@@ -215,8 +257,10 @@ globalThis.fetch = async (input, init) => {
   ) {
     const requestedTitles = new Set((url.searchParams.get("titles") ?? "").split("|"));
     const missingCanonical = requestedTitles.size === 1 && requestedTitles.has("D-Q9000003");
+    const capturedAtf = requestedTitles.size === 1 && requestedTitles.has("CDLI-ATF-L-Q894483");
+    const partialDocuments = requestedTitles.size === documentTitles.size && [...documentTitles].every((title) => requestedTitles.has(title.replaceAll("Q9000002", "Q9000004")));
     if (
-      !missingCanonical &&
+      !missingCanonical && !capturedAtf && !partialDocuments &&
       (requestedTitles.size !== documentTitles.size ||
         ![...documentTitles].every((title) => requestedTitles.has(title)))
     ) {
@@ -234,7 +278,7 @@ globalThis.fetch = async (input, init) => {
     return json({
       ...revisions,
       query: {
-        pages: missingCanonical
+        pages: capturedAtf ? hs751Document.query.pages : partialDocuments ? partialPages : missingCanonical
           ? [{ ns: 0, title: "D-Q9000003", missing: true }]
           : revisions.query.pages.filter((page) => requestedTitles.has(page.title)),
       },

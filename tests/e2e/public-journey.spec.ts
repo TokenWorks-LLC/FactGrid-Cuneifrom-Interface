@@ -150,7 +150,7 @@ test("catalogue search opens a multi-edition tablet", async ({ page }) => {
   await page.getByRole("button", { name: "Apply search" }).click();
   await expect(page).toHaveURL(/collection=Q9000100/);
   const result = page.getByRole("link", { name: /TEST FIXTURE.*tablet with editions/ }).first();
-  await expect(result).toHaveAttribute("href", "/tablets/Q9000002");
+  await expect(result).toHaveAttribute("href", /^\/tablets\/Q9000002\?returnTo=/);
   await result.click();
 
   await expect(page.getByRole("heading", { level: 1 })).toContainText("TEST FIXTURE");
@@ -159,12 +159,15 @@ test("catalogue search opens a multi-edition tablet", async ({ page }) => {
   await expect(page.getByRole("navigation", { name: "Edition index" })).toBeVisible();
   await page.locator("#comparison-left").selectOption("1");
   await expect(page.locator("#comparison-left + pre")).toContainText("PTEST002:obverse.1.1");
+  await page.getByRole("link", { name: "Back to catalogue", exact: true }).click();
+  await expect(page).toHaveURL(/collection=Q9000100/);
+  await expect(page.getByLabel("Name or identifier")).toHaveValue("TEST FIXTURE");
 });
 
-test("facet search finds holding and period values outside the current results page", async ({ page }) => {
+test("catalogue-wide facet search finds holding and period values outside the current results page", async ({ page }) => {
   await page.goto("/browse?q=Prag+I+437");
   const collection = page.getByLabel("Collection / holding", { exact: true });
-  await expect(collection.locator('option:has-text("University of Jena")')).toHaveCount(0);
+  await expect(collection.locator('option[value="Q21880"]')).toHaveText("Friedrich-Schiller-University Jena (Q21880)");
 
   await page.getByLabel("Find more holdings by name").fill("University of Jena");
   await expect(collection.locator('option[value="Q21880"]')).toHaveText("Friedrich-Schiller-University Jena (Q21880)");
@@ -176,7 +179,7 @@ test("facet search finds holding and period values outside the current results p
 
   await page.goto("/browse?q=Prag+I+437");
   const period = page.getByLabel("Period / style", { exact: true });
-  await expect(period.locator('option:has-text("Ur III Period")')).toHaveCount(0);
+  await expect(period.locator('option[value="Q512148"]')).toHaveText("Ur III Period (Q512148)");
   await page.getByLabel("Find more periods by name").fill("Ur III Period");
   await expect(period.locator('option[value="Q512148"]')).toHaveText("Ur III Period (Q512148)");
   await period.selectOption("Q512148");
@@ -322,7 +325,12 @@ test("record material opens a filtered overview and keeps its definition link", 
   await expect(page).toHaveURL(/\/browse\?material=Q9000103$/);
   await expect(page.getByRole("heading", { name: "Browse tablets" })).toBeVisible();
   await expect(page.getByLabel("Material", { exact: true })).toHaveValue("Q9000103");
-  await expect(page.getByRole("link", { name: /TEST FIXTURE.*tablet with editions/ }).first()).toHaveAttribute("href", "/tablets/Q9000002");
+  const recordLink = page.getByRole("link", { name: /TEST FIXTURE.*tablet with editions/ }).first();
+  await expect(recordLink).toHaveAttribute("href", /^\/tablets\/Q9000002\?returnTo=/);
+  const target = new URL((await recordLink.getAttribute("href"))!, "http://localhost");
+  const returnUrl = new URL(target.searchParams.get("returnTo")!, "http://localhost");
+  expect(returnUrl.pathname).toBe("/browse");
+  expect(returnUrl.searchParams.get("material")).toBe("Q9000103");
 });
 
 test("Unicode editions offer a font choice in the edition and comparison views", async ({ page }) => {

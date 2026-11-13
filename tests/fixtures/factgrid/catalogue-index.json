@@ -1,0 +1,568 @@
+{
+  "version": 1,
+  "policy": "clay-tablet-p2-p3-v1",
+  "classes": [
+    "Q512006"
+  ],
+  "startedAt": "2026-11-13T00:00:00Z",
+  "generatedAt": "2026-11-13T00:01:00Z",
+  "complete": true,
+  "sourceCount": 31,
+  "records": [
+    {
+      "id": "Q894307",
+      "label": "TEST FIXTURE Jena tablet",
+      "terms": "Prag I 437 TEST FIXTURE",
+      "collection": [
+        "Q21880"
+      ],
+      "findspot": [
+        "Q9000101"
+      ],
+      "period": [
+        "Q512148"
+      ],
+      "language": [],
+      "workType": [],
+      "material": [
+        "Q9000103"
+      ]
+    },
+    {
+      "id": "Q894483",
+      "label": "Cuneiform Tablet HS 751",
+      "terms": "HS 751 TMH 5 001",
+      "collection": [
+        "Q21880"
+      ],
+      "findspot": [
+        "Q390017"
+      ],
+      "period": [
+        "Q512142"
+      ],
+      "language": [],
+      "workType": [],
+      "material": []
+    },
+    {
+      "id": "Q9000001",
+      "label": "TEST FIXTURE sparse tablet",
+      "terms": "TEST FIXTURE sparse",
+      "collection": [],
+      "findspot": [],
+      "period": [],
+      "language": [],
+      "workType": [],
+      "material": []
+    },
+    {
+      "id": "Q9000002",
+      "label": "TEST FIXTURE tablet with editions",
+      "terms": "Prag I 437 TEST FIXTURE",
+      "collection": [
+        "Q9000100"
+      ],
+      "findspot": [
+        "Q9000101"
+      ],
+      "period": [
+        "Q9000102"
+      ],
+      "language": [],
+      "workType": [],
+      "material": [
+        "Q9000103"
+      ]
+    },
+    {
+      "id": "Q9000003",
+      "label": "TEST FIXTURE missing document",
+      "terms": "TEST FIXTURE missing",
+      "collection": [],
+      "findspot": [],
+      "period": [],
+      "language": [],
+      "workType": [],
+      "material": []
+    },
+    {
+      "id": "Q9000004",
+      "label": "TEST FIXTURE partial edition failure",
+      "terms": "TEST FIXTURE partial",
+      "collection": [],
+      "findspot": [],
+      "period": [],
+      "language": [],
+      "workType": [],
+      "material": []
+    },
+    {
+      "id": "Q9100001",
+      "label": "TEST FIXTURE PaginationFixture 1",
+      "terms": "PaginationFixture",
+      "collection": [
+        "Q9200001"
+      ],
+      "findspot": [],
+      "period": [],
+      "language": [],
+      "workType": [],
+      "material": []
+    },
+    {
+      "id": "Q9100002",
+      "label": "TEST FIXTURE PaginationFixture 2",
+      "terms": "PaginationFixture",
+      "collection": [
+        "Q9200001"
+      ],
+      "findspot": [],
+      "period": [],
+      "language": [],
+      "workType": [],
+      "material": []
+    },
+    {
+      "id": "Q9100003",
+      "label": "TEST FIXTURE PaginationFixture 3",
+      "terms": "PaginationFixture",
+      "collection": [
+        "Q9200001"
+      ],
+      "findspot": [],
+      "period": [],
+      "language": [],
+      "workType": [],
+      "material": []
+    },
+    {
+      "id": "Q9100004",
+      "label": "TEST FIXTURE PaginationFixture 4",
+      "terms": "PaginationFixture",
+      "collection": [
+        "Q9200001"
+      ],
+      "findspot": [],
+      "period": [],
+      "language": [],
+      "workType": [],
+      "material": []
+    },
+    {
+      "id": "Q9100005",
+      "label": "TEST FIXTURE PaginationFixture 5",
+      "terms": "PaginationFixture",
+      "collection": [
+        "Q9200001"
+      ],
+      "findspot": [],
+      "period": [],
+      "language": [],
+      "workType": [],
+      "material": []
+    },
+    {
+      "id": "Q9100006",
+      "label": "TEST FIXTURE PaginationFixture 6",
+      "terms": "PaginationFixture",
+      "collection": [
+        "Q9200001"
+      ],
+      "findspot": [],
+      "period": [],
+      "language": [],
+      "workType": [],
+      "material": []
+    },
+    {
+      "id": "Q9100007",
+      "label": "TEST FIXTURE PaginationFixture 7",
+      "terms": "PaginationFixture",
+      "collection": [
+        "Q9200001"
+      ],
+      "findspot": [],
+      "period": [],
+      "language": [],
+      "workType": [],
+      "material": []
+    },
+    {
+      "id": "Q9100008",
+      "label": "TEST FIXTURE PaginationFixture 8",
+      "terms": "PaginationFixture",
+      "collection": [
+        "Q9200001"
+      ],
+      "findspot": [],
+      "period": [],
+      "language": [],
+      "workType": [],
+      "material": []
+    },
+    {
+      "id": "Q9100009",
+      "label": "TEST FIXTURE PaginationFixture 9",
+      "terms": "PaginationFixture",
+      "collection": [
+        "Q9200001"
+      ],
+      "findspot": [],
+      "period": [],
+      "language": [],
+      "workType": [],
+      "material": []
+    },
+    {
+      "id": "Q9100010",
+      "label": "TEST FIXTURE PaginationFixture 10",
+      "terms": "PaginationFixture",
+      "collection": [
+        "Q9200001"
+      ],
+      "findspot": [],
+      "period": [],
+      "language": [],
+      "workType": [],
+      "material": []
+    },
+    {
+      "id": "Q9100011",
+      "label": "TEST FIXTURE PaginationFixture 11",
+      "terms": "PaginationFixture",
+      "collection": [
+        "Q9200001"
+      ],
+      "findspot": [],
+      "period": [],
+      "language": [],
+      "workType": [],
+      "material": []
+    },
+    {
+      "id": "Q9100012",
+      "label": "TEST FIXTURE PaginationFixture 12",
+      "terms": "PaginationFixture",
+      "collection": [
+        "Q9200001"
+      ],
+      "findspot": [],
+      "period": [],
+      "language": [],
+      "workType": [],
+      "material": []
+    },
+    {
+      "id": "Q9100013",
+      "label": "TEST FIXTURE PaginationFixture 13",
+      "terms": "PaginationFixture",
+      "collection": [
+        "Q9200001"
+      ],
+      "findspot": [],
+      "period": [],
+      "language": [],
+      "workType": [],
+      "material": []
+    },
+    {
+      "id": "Q9100014",
+      "label": "TEST FIXTURE PaginationFixture 14",
+      "terms": "PaginationFixture",
+      "collection": [
+        "Q9200001"
+      ],
+      "findspot": [],
+      "period": [],
+      "language": [],
+      "workType": [],
+      "material": []
+    },
+    {
+      "id": "Q9100015",
+      "label": "TEST FIXTURE PaginationFixture 15",
+      "terms": "PaginationFixture",
+      "collection": [
+        "Q9200001"
+      ],
+      "findspot": [],
+      "period": [],
+      "language": [],
+      "workType": [],
+      "material": []
+    },
+    {
+      "id": "Q9100016",
+      "label": "TEST FIXTURE PaginationFixture 16",
+      "terms": "PaginationFixture",
+      "collection": [
+        "Q9200001"
+      ],
+      "findspot": [],
+      "period": [],
+      "language": [],
+      "workType": [],
+      "material": []
+    },
+    {
+      "id": "Q9100017",
+      "label": "TEST FIXTURE PaginationFixture 17",
+      "terms": "PaginationFixture",
+      "collection": [
+        "Q9200001"
+      ],
+      "findspot": [],
+      "period": [],
+      "language": [],
+      "workType": [],
+      "material": []
+    },
+    {
+      "id": "Q9100018",
+      "label": "TEST FIXTURE PaginationFixture 18",
+      "terms": "PaginationFixture",
+      "collection": [
+        "Q9200001"
+      ],
+      "findspot": [],
+      "period": [],
+      "language": [],
+      "workType": [],
+      "material": []
+    },
+    {
+      "id": "Q9100019",
+      "label": "TEST FIXTURE PaginationFixture 19",
+      "terms": "PaginationFixture",
+      "collection": [
+        "Q9200001"
+      ],
+      "findspot": [],
+      "period": [],
+      "language": [],
+      "workType": [],
+      "material": []
+    },
+    {
+      "id": "Q9100020",
+      "label": "TEST FIXTURE PaginationFixture 20",
+      "terms": "PaginationFixture",
+      "collection": [
+        "Q9200001"
+      ],
+      "findspot": [],
+      "period": [],
+      "language": [],
+      "workType": [],
+      "material": []
+    },
+    {
+      "id": "Q9100021",
+      "label": "TEST FIXTURE PaginationFixture 21",
+      "terms": "PaginationFixture",
+      "collection": [
+        "Q9200001"
+      ],
+      "findspot": [],
+      "period": [],
+      "language": [],
+      "workType": [],
+      "material": []
+    },
+    {
+      "id": "Q9100022",
+      "label": "TEST FIXTURE PaginationFixture 22",
+      "terms": "PaginationFixture",
+      "collection": [
+        "Q9200001"
+      ],
+      "findspot": [],
+      "period": [],
+      "language": [],
+      "workType": [],
+      "material": []
+    },
+    {
+      "id": "Q9100023",
+      "label": "TEST FIXTURE PaginationFixture 23",
+      "terms": "PaginationFixture",
+      "collection": [
+        "Q9200001"
+      ],
+      "findspot": [],
+      "period": [],
+      "language": [],
+      "workType": [],
+      "material": []
+    },
+    {
+      "id": "Q9100024",
+      "label": "TEST FIXTURE PaginationFixture 24",
+      "terms": "PaginationFixture",
+      "collection": [
+        "Q9200001"
+      ],
+      "findspot": [],
+      "period": [],
+      "language": [],
+      "workType": [],
+      "material": []
+    },
+    {
+      "id": "Q9100025",
+      "label": "TEST FIXTURE PaginationFixture 25",
+      "terms": "PaginationFixture",
+      "collection": [
+        "Q9200001",
+        "Q9300001",
+        "Q9300002",
+        "Q9300003",
+        "Q9300004",
+        "Q9300005",
+        "Q9300006",
+        "Q9300007",
+        "Q9300008",
+        "Q9300009",
+        "Q9300010",
+        "Q9300011",
+        "Q9300012",
+        "Q9300013",
+        "Q9300014",
+        "Q9300015",
+        "Q9300016",
+        "Q9300017",
+        "Q9300018",
+        "Q9300019",
+        "Q9300020",
+        "Q9300021",
+        "Q9300022",
+        "Q9300023",
+        "Q9300024",
+        "Q9300025",
+        "Q9300026",
+        "Q9300027",
+        "Q9300028",
+        "Q9300029",
+        "Q9300030",
+        "Q9300031",
+        "Q9300032",
+        "Q9300033",
+        "Q9300034",
+        "Q9300035",
+        "Q9300036",
+        "Q9300037",
+        "Q9300038",
+        "Q9300039",
+        "Q9300040",
+        "Q9300041",
+        "Q9300042",
+        "Q9300043",
+        "Q9300044",
+        "Q9300045",
+        "Q9300046",
+        "Q9300047",
+        "Q9300048",
+        "Q9300049",
+        "Q9300050",
+        "Q9300051",
+        "Q9300052",
+        "Q9300053",
+        "Q9300054",
+        "Q9300055",
+        "Q9300056",
+        "Q9300057",
+        "Q9300058",
+        "Q9300059",
+        "Q9300060"
+      ],
+      "findspot": [
+        "Q9200002"
+      ],
+      "period": [
+        "Q9200003"
+      ],
+      "language": [],
+      "workType": [],
+      "material": []
+    }
+  ],
+  "labels": {
+    "Q21880": "Friedrich-Schiller-University Jena",
+    "Q390017": "TEST FIXTURE HS 751 findspot",
+    "Q512142": "TEST FIXTURE HS 751 period",
+    "Q512148": "Ur III Period",
+    "Q9000100": "TEST FIXTURE collection",
+    "Q9000101": "TEST FIXTURE findspot",
+    "Q9000102": "TEST FIXTURE period",
+    "Q9000103": "TEST FIXTURE clay",
+    "Q9200001": "TEST FIXTURE pagination collection",
+    "Q9200002": "TEST FIXTURE distant findspot",
+    "Q9200003": "TEST FIXTURE distant period",
+    "Q9300001": "TEST FIXTURE holding 001",
+    "Q9300002": "TEST FIXTURE holding 002",
+    "Q9300003": "TEST FIXTURE holding 003",
+    "Q9300004": "TEST FIXTURE holding 004",
+    "Q9300005": "TEST FIXTURE holding 005",
+    "Q9300006": "TEST FIXTURE holding 006",
+    "Q9300007": "TEST FIXTURE holding 007",
+    "Q9300008": "TEST FIXTURE holding 008",
+    "Q9300009": "TEST FIXTURE holding 009",
+    "Q9300010": "TEST FIXTURE holding 010",
+    "Q9300011": "TEST FIXTURE holding 011",
+    "Q9300012": "TEST FIXTURE holding 012",
+    "Q9300013": "TEST FIXTURE holding 013",
+    "Q9300014": "TEST FIXTURE holding 014",
+    "Q9300015": "TEST FIXTURE holding 015",
+    "Q9300016": "TEST FIXTURE holding 016",
+    "Q9300017": "TEST FIXTURE holding 017",
+    "Q9300018": "TEST FIXTURE holding 018",
+    "Q9300019": "TEST FIXTURE holding 019",
+    "Q9300020": "TEST FIXTURE holding 020",
+    "Q9300021": "TEST FIXTURE holding 021",
+    "Q9300022": "TEST FIXTURE holding 022",
+    "Q9300023": "TEST FIXTURE holding 023",
+    "Q9300024": "TEST FIXTURE holding 024",
+    "Q9300025": "TEST FIXTURE holding 025",
+    "Q9300026": "TEST FIXTURE holding 026",
+    "Q9300027": "TEST FIXTURE holding 027",
+    "Q9300028": "TEST FIXTURE holding 028",
+    "Q9300029": "TEST FIXTURE holding 029",
+    "Q9300030": "TEST FIXTURE holding 030",
+    "Q9300031": "TEST FIXTURE holding 031",
+    "Q9300032": "TEST FIXTURE holding 032",
+    "Q9300033": "TEST FIXTURE holding 033",
+    "Q9300034": "TEST FIXTURE holding 034",
+    "Q9300035": "TEST FIXTURE holding 035",
+    "Q9300036": "TEST FIXTURE holding 036",
+    "Q9300037": "TEST FIXTURE holding 037",
+    "Q9300038": "TEST FIXTURE holding 038",
+    "Q9300039": "TEST FIXTURE holding 039",
+    "Q9300040": "TEST FIXTURE holding 040",
+    "Q9300041": "TEST FIXTURE holding 041",
+    "Q9300042": "TEST FIXTURE holding 042",
+    "Q9300043": "TEST FIXTURE holding 043",
+    "Q9300044": "TEST FIXTURE holding 044",
+    "Q9300045": "TEST FIXTURE holding 045",
+    "Q9300046": "TEST FIXTURE holding 046",
+    "Q9300047": "TEST FIXTURE holding 047",
+    "Q9300048": "TEST FIXTURE holding 048",
+    "Q9300049": "TEST FIXTURE holding 049",
+    "Q9300050": "TEST FIXTURE holding 050",
+    "Q9300051": "TEST FIXTURE holding 051",
+    "Q9300052": "TEST FIXTURE holding 052",
+    "Q9300053": "TEST FIXTURE holding 053",
+    "Q9300054": "TEST FIXTURE holding 054",
+    "Q9300055": "TEST FIXTURE holding 055",
+    "Q9300056": "TEST FIXTURE holding 056",
+    "Q9300057": "TEST FIXTURE holding 057",
+    "Q9300058": "TEST FIXTURE holding 058",
+    "Q9300059": "TEST FIXTURE holding 059",
+    "Q9300060": "TEST FIXTURE holding 060"
+  },
+  "facetAliases": {
+    "Q21880": [
+      "University of Jena"
+    ]
+  }
+}

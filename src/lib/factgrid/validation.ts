@@ -41,6 +41,14 @@ export function normalizeSearchInput(input: SearchInput = {}): NormalizedSearchI
     );
   }
 
+  const pageSize = boundedInteger(input.pageSize, FACTGRID_LIMITS.defaultPageSize, 1, FACTGRID_LIMITS.maxPageSize, "Page size");
+  if (input.catalogueVersion !== undefined &&
+      (typeof input.catalogueVersion !== "string" || input.catalogueVersion.length > 40 ||
+       !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{3})?Z$/u.test(input.catalogueVersion) ||
+       !Number.isFinite(Date.parse(input.catalogueVersion)))) {
+    throw new FactGridInputError("Catalogue version must be a valid scan timestamp.");
+  }
+
   return {
     q,
     collection:
@@ -59,14 +67,11 @@ export function normalizeSearchInput(input: SearchInput = {}): NormalizedSearchI
       input.workType === undefined ? undefined : parseQid(input.workType, "Type of work"),
     material:
       input.material === undefined ? undefined : parseQid(input.material, "Material"),
-    page: boundedInteger(input.page, 1, 1, FACTGRID_LIMITS.maxPage, "Page"),
-    pageSize: boundedInteger(
-      input.pageSize,
-      FACTGRID_LIMITS.defaultPageSize,
-      1,
-      FACTGRID_LIMITS.maxPageSize,
-      "Page size",
-    ),
+    // Bound arithmetic rather than the corpus. Provider fallback has its own
+    // verified deep-offset restriction; snapshot navigation has no page cap.
+    page: boundedInteger(input.page, 1, 1, Math.floor(Number.MAX_SAFE_INTEGER / pageSize), "Page"),
+    pageSize,
+    ...(input.catalogueVersion ? { catalogueVersion: input.catalogueVersion } : {}),
   };
 }
 

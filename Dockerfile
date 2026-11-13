@@ -9,6 +9,8 @@ RUN npm ci
 
 FROM dependencies AS build
 
+ARG FACTGRID_BUILD_REVISION=unknown
+ENV FACTGRID_BUILD_REVISION=$FACTGRID_BUILD_REVISION
 COPY . .
 RUN npm run build \
   && npm prune --omit=dev

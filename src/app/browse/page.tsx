@@ -6,8 +6,11 @@ import { Badge } from "@/components/ui/badge";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { FacetSelect } from "./facet-select";
+import { ReadRetryButton } from "@/components/read-retry-button";
+import { isFactGridError } from "@/lib/factgrid/errors";
 import type { LabeledEntity, TabletSearchPage } from "@/lib/factgrid";
 import { searchTablets } from "@/lib/factgrid/server";
+import { loadCatalogueIndex } from "@/lib/factgrid/catalogue-index.server";
 import { cn } from "@/lib/utils";
 
 export const metadata: Metadata = {
@@ -18,19 +21,20 @@ export const metadata: Metadata = {
 export const dynamic = "force-dynamic";
 
 type BrowseSearchParams = Promise<
-  Record<"q" | "collection" | "findspot" | "period" | "language" | "workType" | "material" | "page", string | string[] | undefined>
+  Record<"q" | "collection" | "findspot" | "period" | "language" | "workType" | "material" | "page" | "snapshot", string | string[] | undefined>
 >;
 
 function first(value: string | string[] | undefined): string {
   return typeof value === "string" ? value : (value?.[0] ?? "");
 }
 
-function pageUrl(values: Record<string, string>, page: number): string {
+function pageUrl(values: Record<string, string>, page: number, snapshot?: string): string {
   const params = new URLSearchParams(
     Object.entries(values).filter((entry): entry is [string, string] => Boolean(entry[1])),
   );
   if (page > 1) params.set("page", String(page));
   else params.delete("page");
+  if (snapshot) params.set("snapshot", snapshot);
   const query = params.toString();
   return query ? `/browse?${query}` : "/browse";
 }
@@ -39,6 +43,7 @@ function contextualFacetOptions(
   results: TabletSearchPage["results"],
   property: "holdings" | "findspots" | "periods" | "languages" | "workTypes" | "materials",
   selected: string,
+  selectedLabel?: string,
 ): LabeledEntity[] {
   const options = new Map<string, LabeledEntity>();
   for (const result of results) {
@@ -47,7 +52,7 @@ function contextualFacetOptions(
   if (/^Q[1-9][0-9]{0,14}$/u.test(selected) && !options.has(selected)) {
     options.set(selected, {
       id: selected as LabeledEntity["id"],
-      label: selected,
+      label: selectedLabel || selected,
       url: `https://database.factgrid.de/wiki/Item:${selected}`,
     });
   }
@@ -62,17 +67,19 @@ export default async function BrowsePage({ searchParams }: { searchParams: Brows
   const raw = await searchParams;
   const values = {
     q: first(raw.q).trim(),
-    collection: first(raw.collection).trim(),
-    findspot: first(raw.findspot).trim(),
-    period: first(raw.period).trim(),
-    language: first(raw.language).trim(),
-    workType: first(raw.workType).trim(),
-    material: first(raw.material).trim(),
+    collection: first(raw.collection).trim().toUpperCase(),
+    findspot: first(raw.findspot).trim().toUpperCase(),
+    period: first(raw.period).trim().toUpperCase(),
+    language: first(raw.language).trim().toUpperCase(),
+    workType: first(raw.workType).trim().toUpperCase(),
+    material: first(raw.material).trim().toUpperCase(),
   };
   const pageValue = Number.parseInt(first(raw.page) || "1", 10);
-  const page = Number.isSafeInteger(pageValue) ? Math.min(100, Math.max(1, pageValue)) : 1;
+  const page = Number.isSafeInteger(pageValue) ? Math.max(1, pageValue) : 1;
 
-  const results = await searchTablets({
+  let results;
+  try {
+    results = await searchTablets({
     q: values.q,
     collection: values.collection || undefined,
     findspot: values.findspot || undefined,
@@ -81,14 +88,32 @@ export default async function BrowsePage({ searchParams }: { searchParams: Brows
     workType: values.workType || undefined,
     material: values.material || undefined,
     page,
-  });
+    catalogueVersion: first(raw.snapshot) || undefined,
+    });
+  } catch (error) {
+    if (!isFactGridError(error)) throw error;
+    const invalid = error.code === "INVALID_INPUT";
+    return (
+      <main className="site-container py-16" id="main-content">
+        <h1 className="font-heading text-4xl font-medium">{invalid ? "Search could not be applied" : "Catalogue search is unavailable"}</h1>
+        <p className="mt-4 max-w-[65ch] leading-7 text-muted-foreground">
+          {invalid ? error.message : "The source request did not complete or could not be validated. This does not mean there are no matching tablets."}
+        </p>
+        <div className="mt-6 flex flex-wrap items-center gap-5">
+          {error.retryable ? <ReadRetryButton label="Try again" /> : null}
+          <Link className="focus-ring inline-flex min-h-11 items-center text-sm underline" href="/browse">Reset the search</Link>
+        </div>
+      </main>
+    );
+  }
+  const index = await loadCatalogueIndex();
   const facets = {
-    collections: contextualFacetOptions(results.results, "holdings", values.collection),
-    findspots: contextualFacetOptions(results.results, "findspots", values.findspot),
-    periods: contextualFacetOptions(results.results, "periods", values.period),
-    languages: contextualFacetOptions(results.results, "languages", values.language),
-    workTypes: contextualFacetOptions(results.results, "workTypes", values.workType),
-    materials: contextualFacetOptions(results.results, "materials", values.material),
+    collections: contextualFacetOptions(results.results, "holdings", values.collection, index?.labels[values.collection]),
+    findspots: contextualFacetOptions(results.results, "findspots", values.findspot, index?.labels[values.findspot]),
+    periods: contextualFacetOptions(results.results, "periods", values.period, index?.labels[values.period]),
+    languages: contextualFacetOptions(results.results, "languages", values.language, index?.labels[values.language]),
+    workTypes: contextualFacetOptions(results.results, "workTypes", values.workType, index?.labels[values.workType]),
+    materials: contextualFacetOptions(results.results, "materials", values.material, index?.labels[values.material]),
   };
 
   const hasFilters = Object.values(values).some(Boolean);
@@ -173,8 +198,8 @@ export default async function BrowsePage({ searchParams }: { searchParams: Brows
                 value={values.material}
               />
               <p className="text-xs leading-5 text-muted-foreground">
-                Choices from this results page appear first. Search FactGrid by name for more;
-                choose a matching entity above, then apply the search. Some entities may have no matching tablets.
+                Search each filter by label or QID, choose a value, then apply the search.
+                Large lists have their own value pages; your selection stays selected while browsing them.
               </p>
 
               <div className="flex flex-wrap gap-2">
@@ -201,17 +226,32 @@ export default async function BrowsePage({ searchParams }: { searchParams: Brows
                 {values.q ? `Results for “${values.q}”` : "Catalogue records"}
               </h2>
               <p className="mt-2 text-sm text-muted-foreground">
-                Page {results.page}. FactGrid&apos;s live index may change between visits.
+                Page {results.page}.
+                {results.catalogue?.source === "snapshot"
+                  ? ` ${results.catalogue.totalResults?.toLocaleString("en") ?? "Matching"} indexed records. Stable QID order.`
+                  : " FactGrid’s live index may change between visits."}
               </p>
             </div>
             {hasFilters ? <Badge variant="outline">Filtered</Badge> : null}
           </div>
 
+          <p className="border-b border-border py-4 text-sm leading-6 text-muted-foreground" role="status">
+            {results.catalogue?.complete
+              ? `Catalogue-wide discovery index refreshed ${results.catalogue.generatedAt ? new Date(results.catalogue.generatedAt).toLocaleString("en-GB", { timeZone: "UTC" }) + " UTC" : "at an unavailable timestamp"}. Record details are checked live; later source changes appear after the next refresh.`
+              : "Catalogue-wide discovery is unavailable. Live search has a provider limit of 10,000 results; filter name suggestions may include unrelated entities. Direct tablet URLs remain available."}
+          </p>
+
+          {results.catalogue?.restarted ? (
+            <p className="border-b border-border bg-secondary/40 p-4 text-sm leading-6" role="status">
+              The catalogue was refreshed. Showing page 1 with your search and filters so you can continue through the updated results.
+            </p>
+          ) : null}
+
           {results.results.length === 0 ? (
             <div className="border-b border-border py-14">
               <h3 className="font-heading text-2xl font-medium">No matching tablets</h3>
               <p className="mt-3 max-w-[58ch] leading-7 text-muted-foreground">
-                FactGrid answered successfully, but no current catalogue record matched this combination. Try fewer filters or a shorter identifier.
+                No current tablet was returned on this page. Try fewer filters, a shorter identifier, or the previous page. The discovery index can briefly retain records changed in FactGrid.
               </p>
               <Link className="focus-ring mt-5 inline-flex min-h-11 items-center font-medium underline underline-offset-4" href="/browse">
                 Reset the search
@@ -226,7 +266,7 @@ export default async function BrowsePage({ searchParams }: { searchParams: Brows
                       <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
                         <Link
                           className="focus-ring font-heading text-2xl font-medium decoration-primary/35 underline-offset-4 hover:underline"
-                          href={`/tablets/${tablet.qid}`}
+                          href={`/tablets/${tablet.qid}?returnTo=${encodeURIComponent(pageUrl(values, results.page, results.catalogue?.generatedAt))}`}
                         >
                           {tablet.title}
                         </Link>
@@ -249,7 +289,7 @@ export default async function BrowsePage({ searchParams }: { searchParams: Brows
                       <Link
                         aria-label={`Open ${tablet.title}`}
                         className="focus-ring inline-flex min-h-11 items-center gap-2 text-sm font-semibold underline decoration-primary/35 underline-offset-4 hover:decoration-primary"
-                        href={`/tablets/${tablet.qid}`}
+                        href={`/tablets/${tablet.qid}?returnTo=${encodeURIComponent(pageUrl(values, results.page, results.catalogue?.generatedAt))}`}
                       >
                         Read record
                         <ArrowRight aria-hidden="true" className="size-4" />
@@ -274,7 +314,7 @@ export default async function BrowsePage({ searchParams }: { searchParams: Brows
             {results.page > 1 ? (
               <Link
                 className={cn(buttonVariants({ variant: "outline" }), "min-h-11 rounded-none px-4")}
-                href={pageUrl(values, results.page - 1)}
+                href={pageUrl(values, results.page - 1, results.catalogue?.generatedAt)}
               >
                 <ArrowLeft aria-hidden="true" className="size-4" />
                 Previous
@@ -285,7 +325,7 @@ export default async function BrowsePage({ searchParams }: { searchParams: Brows
             {results.hasNextPage ? (
               <Link
                 className={cn(buttonVariants({ variant: "outline" }), "min-h-11 rounded-none px-4")}
-                href={pageUrl(values, results.page + 1)}
+                href={pageUrl(values, results.page + 1, results.catalogue?.generatedAt)}
               >
                 Next
                 <ArrowRight aria-hidden="true" className="size-4" />

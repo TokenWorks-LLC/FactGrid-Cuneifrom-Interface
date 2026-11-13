@@ -84,6 +84,137 @@ backend port as an alternate sign-in origin.
 
 ## Reading-only deployment
 
+### Catalogue discovery index
+
+Full-catalogue browsing uses a compact read-only JSON artifact, separate from
+scholarly sources and the session database. Set `FACTGRID_CATALOGUE_INDEX` to its
+absolute deployment path (default `.data/catalogue-index.json`). It stores QIDs,
+names/aliases/identifiers, and six facet properties; it contains no edition text,
+credentials, or full editable entities. The runtime does not refresh it on page
+loads. Without a valid artifact, the UI explicitly reports limited live search;
+CirrusSearch cannot expose results past its verified 10,000-result window.
+
+Generate locally or on the operator's maintenance host with outbound FactGrid
+HTTPS access:
+
+```bash
+npm run catalogue:refresh -- --classes Q512006 --policy clay-tablet-p2-p3-v1 --batch-size 1000 --max-batches 20
+```
+
+This bounded invocation checkpoints up to twenty batches. Repeat the same command
+to resume until it prints `"status":"complete"`. For an attended initial full
+scan, `--max-batches 1000` avoids repeated invocations while retaining per-request
+timeouts, response limits, and checkpoints. `--output /data/catalogue-index.json`
+selects the release artifact location. Each request is read-only; the script
+never calls a FactGrid mutation API.
+
+The generator verifies the reviewed subclass closure, enumerates active P2
+statements using strict lexicographic QID keysets, projects bounded metadata,
+resolves multilingual facet labels/aliases, and compares start/end counts with
+the enumerated count. It publishes by atomic replacement only after exhaustion
+and validation. No offset cap or arbitrary facet truncation is used. The scan
+interval is `startedAt` through `generatedAt`; upstream RDF is not transactionally
+frozen. Balanced source changes during a scan and RDF/API indexing lag remain
+possible. Current page entities and filter values are rechecked through the API;
+stale records leave holes, and newly indexed records appear after refresh.
+
+Pagination links carry the index generation timestamp. If it changes before
+the next page is opened, browsing restarts at page one with the same search and
+filters and a visible notice. This prevents silently continuing across different
+index versions. A direct page URL without a timestamp uses the current index.
+Record links retain a validated internal browse return URL, so **Back to
+catalogue** restores the search, filters, page and index version.
+
+Published indexes carry version, eligibility policy, class closure, count, and
+freshness. The loader rejects malformed, oversized, partial, or incompatible
+artifacts and retains its last valid in-memory index. The file itself remains
+the durable last-known-good artifact. An unreadable first deployment falls back
+with an incomplete status, never a claim of full coverage.
+
+For a **new refresh**, archive the completed `.checkpoint` file before rerunning;
+rerunning an exhausted checkpoint preserves its original freshness date. Keep
+the published `.json` file in place during refresh. For an interrupted scan,
+resume its checkpoint. A `.lock` prevents concurrent writers. If an abrupt kill
+leaves a lock, inspect its recorded PID and verify that process has exited before
+removing that exact lock file. Never delete a lock belonging to a running scan.
+If membership counts or the class closure change, the command fails while
+retaining the publication; inspect the message, archive the checkpoint, and
+start a new reviewed scan. Do not edit `complete` or source counts by hand.
+
+Recommended operator policy: refresh weekly and after a known bulk import;
+monitor the displayed freshness and generator exit status. This repository does
+not install a scheduler or assume permission to manage the university service.
+An older valid artifact remains usable and is visibly dated. Transfer only a
+validated completed artifact, then atomically replace the mounted file. Do not
+commit generated production indexes. Back up the published artifact separately
+from private session state. Review the 64 MB artifact and 8 MB response bounds
+if corpus growth causes an explicit size failure.
+
+For Docker, mount the discovery directory as well as the session volume and set
+`FACTGRID_CATALOGUE_INDEX=/catalogue/catalogue-index.json`. A read-only runtime
+mount is sufficient; the refresh process needs its own writable view. Ensure the
+application UID 1001 can read the file and traverse its directory.
+
+### Release provenance and university deployment
+
+The checked-in GitHub Actions workflow validates code; it does not deploy or
+restart the university-hosted service. A push alone is not release confirmation.
+Set the public Git revision **before building**:
+
+```bash
+FACTGRID_BUILD_REVISION=$(git rev-parse HEAD) npm run build
+docker build --build-arg FACTGRID_BUILD_REVISION=$(git rev-parse HEAD) -t factgrid-cuneiform-interface .
+```
+
+These are alternative Node/Docker builds. On PowerShell set
+`$env:FACTGRID_BUILD_REVISION = git rev-parse HEAD` before `npm.cmd run build`.
+The operator deploys that build through the established release process and mounts
+the validated discovery index. `/api/version` returns the embedded revision
+(null when unspecified), policy, and catalogue freshness/count. Under the
+university prefix, check `/cuneiform/api/version`. Compare the full SHA with the
+release commit; do not substitute a new runtime environment value for a rebuild.
+
+After the operator releases it, check Q894483 with `#edition-1`, a collection and
+period filter, deep catalogue pages, and existing Q499899/Q1089841/Q894307/
+Q892185/Q1361363/Q471142 record URLs. Confirm the existing OAuth configuration
+and contributor policy remain in place. No live scholarly writes are needed for
+these smoke checks. Restarting the external service requires operator authority.
+
+### Troubleshooting HS 751 and partial failures
+
+Q894483 already has the verified Clay tablet classification. Its active P251
+statement explicitly links `CDLI-ATF-L-Q894483`; the single linked edition is
+`#edition-1`. The November baseline returned HTTP 200 but failed to recognize
+the unheaded ATF poem. The current parser shows that supported source verbatim
+and read-only. If the format changes, use the displayed source/history links and
+compare its revision before treating it as a parser regression.
+
+Missing items, existing unsupported entities, missing linked pages, unsupported
+formats, and temporary/protocol errors have different messages. Optional label
+errors leave linked QIDs; optional document errors leave metadata and other
+editions visible. A user-initiated retry refreshes bounded uncached optional
+reads; there are no automatic retry loops. A whole document batch failure can
+affect all its editions. Core errors do not become a false missing-record page.
+Handled unsupported/upstream page messages currently use HTTP 200; genuinely
+missing items use the Next.js not-found response.
+
+Absent P329/P695/P853 values are source metadata gaps, not missing dropdown
+options. A known value absent from a completed, dated index may reflect changes
+after that scan or RDF lag; compare API claims, artifact freshness, and refresh
+logs. Never infer a holding or period from a tablet title.
+
+The fixture browser suite uses `.next/dev/cache/fetch-cache`; after changing
+provider fixtures, clear only the corresponding ignored test cache or use a
+fresh checkout before rerunning, so older cached fixture metadata is not mistaken
+for an application regression.
+
+The Docker harness accepts `PLAYWRIGHT_EXECUTABLE_PATH` for an installed Chromium
+browser. If a shared daemon has exhausted its default address pools, inspect
+existing Docker subnets and local routes first, then optionally set
+`FACTGRID_DOCKER_TEST_SUBNET` to a non-conflicting test-only CIDR. The harness
+creates and cleans only its uniquely named resources; do not prune unrelated
+networks to run this test.
+
 No secrets are required. Leave the OAuth fields empty and
 `FACTGRID_EDITING_ENABLED=false`. `/api/session` returns an unavailable status and
 the shared desktop/mobile header keeps `Log in with FactGrid` visible with an

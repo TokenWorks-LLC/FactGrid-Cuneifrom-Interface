@@ -11,6 +11,7 @@ export interface SearchInput {
   material?: string;
   page?: number;
   pageSize?: number;
+  catalogueVersion?: string;
 }
 
 export interface NormalizedSearchInput {
@@ -23,6 +24,7 @@ export interface NormalizedSearchInput {
   material?: Qid;
   page: number;
   pageSize: number;
+  catalogueVersion?: string;
 }
 
 export interface LabeledEntity {
@@ -31,7 +33,7 @@ export interface LabeledEntity {
   url: string;
 }
 
-export type EditionKind = "d" | "cdli" | "oracc" | "unicode" | "other";
+export type EditionKind = "d" | "cdli" | "atf" | "oracc" | "unicode" | "other";
 
 export interface DocumentReference {
   kind: EditionKind;
@@ -52,7 +54,7 @@ export interface ParsedWikitextSection {
 }
 
 export interface TranscriptRegion {
-  format: "plain-poem-v1" | "mixed-wikitext" | "structured-lines";
+  format: "plain-poem-v1" | "mixed-wikitext" | "structured-lines" | "atf-v1";
   content: string;
   displayText: string;
   editable: boolean;
@@ -77,6 +79,7 @@ export type EditionReadStatus =
   | "linked"
   | "missing"
   | "unsupported"
+  | "error"
   | "invalid";
 
 export interface TabletEdition {
@@ -88,6 +91,16 @@ export interface TabletEdition {
   reference?: DocumentReference;
   revision?: DocumentRevision;
   reason?: string;
+  /** Read failure details never confer mutation eligibility. */
+  errorCode?: string;
+  retryable?: boolean;
+}
+
+export interface TabletReadWarning {
+  resource: "labels";
+  code: string;
+  message: string;
+  retryable: boolean;
 }
 
 export interface QuantityValue {
@@ -153,6 +166,7 @@ export interface TabletRecord {
   externalTranscripts: SourceLink[];
   editions: TabletEdition[];
   omittedEditionCount: number;
+  readWarnings?: TabletReadWarning[];
 }
 
 export type TabletSearchResult = Pick<
@@ -176,6 +190,13 @@ export interface TabletSearchPage {
   page: number;
   pageSize: number;
   hasNextPage: boolean;
+  catalogue?: {
+    source: "snapshot" | "live-search";
+    complete: boolean;
+    generatedAt?: string;
+    totalResults?: number;
+    restarted?: boolean;
+  };
 }
 
 export interface TabletFacets {

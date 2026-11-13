@@ -3,7 +3,7 @@ import { mkdirSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { request as httpRequest } from "node:http";
 import { request as httpsRequest } from "node:https";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { basename, dirname, join, resolve } from "node:path";
 import { spawnSync } from "node:child_process";
 
 const suffix = `${Date.now().toString(36)}-${process.pid}-${Math.random().toString(36).slice(2, 8)}`;
@@ -260,7 +260,9 @@ async function navigateSmokePage(page, url) {
 
 async function verifyUnavailableUi(appPort) {
   const { chromium } = await import("playwright");
-  const browser = await chromium.launch();
+  const browser = await chromium.launch(process.env.PLAYWRIGHT_EXECUTABLE_PATH
+    ? { executablePath: process.env.PLAYWRIGHT_EXECUTABLE_PATH }
+    : {});
   try {
     const routes = ["/", "/browse?q=Prag+I+437", "/tablets/Q9000002", "/about"];
     for (const route of routes) {
@@ -331,7 +333,8 @@ async function run() {
     ".",
   ]);
 
-  docker(["network", "create", names.network], { capture: true });
+  const subnet = process.env.FACTGRID_DOCKER_TEST_SUBNET;
+  docker(["network", "create", ...(subnet ? ["--subnet", subnet] : []), names.network], { capture: true });
   docker(["volume", "create", names.dataVolume], { capture: true });
   docker(["volume", "create", names.certVolume], { capture: true });
 
@@ -653,7 +656,11 @@ function cleanup(bestEffort = false) {
       timeout: 5_000,
     });
   }
-  rmSync(temporaryDirectory, { recursive: true, force: true });
+  const cleanupTarget = resolve(temporaryDirectory);
+  if (dirname(cleanupTarget) !== resolve(tmpdir()) || !basename(cleanupTarget).startsWith(`${prefix}-`)) {
+    throw new Error("Refused cleanup outside this smoke test's temporary directory.");
+  }
+  rmSync(cleanupTarget, { recursive: true, force: true });
 
   if (!bestEffort) {
     const remaining = [];

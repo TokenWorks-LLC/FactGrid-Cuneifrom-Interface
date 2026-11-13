@@ -42,13 +42,22 @@ working OpenID discovery endpoint was found, so OAuth configuration is explicit.
 
 ## Catalogue and properties
 
-The project query and live records establish clay-tablet membership as `P2=Q512006`.
-Interactive search uses CirrusSearch with that clause before pagination, then
-revalidates membership through current entity claims.
+Read-only checks on 13 November 2026 establish that Q512006 means **Clay tablet**,
+not Old Assyrian. Q894483 and all six requested comparison records have active
+`P2=Q512006`. The bounded `P3*` subclass query returned only that class. No verified
+alternative class or unclassified ATF-linked record was found. The versioned read
+policy admits active, non-deprecated P2 statements in this verified closure; it
+does not guess eligibility from labels, constructed titles, or tablet-ID lists.
+The legacy exact-class mutation policy is separate.
+
+Complete-index search applies the same policy and all filters before stable QID
+pagination, then revalidates the requested entities through the API. Direct
+record loading works without the discovery index. CirrusSearch is an explicitly
+limited fallback, not evidence of exhaustive coverage.
 
 | Property | Verified use in this interface |
 |---|---|
-| P2 | Instance of; `Q512006` defines catalogue membership |
+| P2 | Instance of; active Q512006 (Clay tablet) belongs to the verified read closure |
 | P11 | Optional title; entity label remains the normal display name |
 | P692 | CDLI ID |
 | P329 | Present holding / collection |
@@ -67,13 +76,39 @@ revalidates membership through current entity claims.
 | P69 | Online transcript; kept as an external link |
 | P251 | FactGrid document page; resolved as a separate edition |
 
-Global grouped and `SELECT DISTINCT` facet scans proved too expensive for an
-interactive request—even a result limit did not bound scan work. The runtime
-shows contextual P329/P695/P853 choices from the current result page and offers
-a bounded, on-demand English/German FactGrid entity-name search for values outside that page.
-Search matches are entity candidates, so some may have no matching tablets. A
-selected QID is still applied in CirrusSearch together with `P2=Q512006` before
-pagination; it is never a local post-filter.
+Global facet scans are excluded from visitor requests. A separately generated,
+validated discovery artifact enumerates values across the scanned corpus,
+resolves labels with language fallback, deduplicates QIDs, and supports bounded
+searchable option pages. Selected filters apply before result pagination. When
+the artifact is unavailable, contextual options and general FactGrid entity-name
+matches remain available with an explicit incomplete-coverage warning.
+
+Live baseline measurements: CirrusSearch reported 152,640 indexed hits and rejected
+offsets 10,000 and 50,000 with `cirrussearch-offset-too-large`. The RDF aggregate
+reported 152,633 records, 99 holdings, 171 finding spots, and 32 periods in
+10,254 ms. These source indexes differ; neither count proves instantaneous API
+completeness. A metadata-presence aggregate timed out after 15 seconds, so missing
+metadata proportions were not established. See [source evidence](handoffs/data-evidence.md).
+
+### HS 751 / Q894483
+
+The API returned item revision 20736312 and active P251 statement
+`Q894483$0ACD95A8-BDFF-4584-BE3C-7104AB8745D0` linking
+`CDLI-ATF-L-Q894483`. The document is wikitext, revision 20109826
+(2026-06-15T16:48:55Z), with one ATF poem beginning `&P020415 = TMH 5, 001`.
+Its holding/findspot/period/language QIDs are Q21880/Q390017/Q512142/Q471149.
+
+Production returned HTTP 200 during this investigation and its first edition
+anchor existed. The old parser displayed “no supported transliteration region
+was recognized.” The confirmed defect is ATF recognition, not membership
+exclusion. The historical 404 could not be reproduced or attributed without
+deployment logs. Production exposed no baseline revision identifier, so an exact
+repository/deployment code match could not be established.
+
+ATF reading requires the exact trusted same-QID family and one unambiguous poem
+containing ATF identification/directives. Content is escaped and preserved
+verbatim. Ambiguous or unrecognized source remains linked and is never converted
+into an editable transcript. Unlinked candidate titles are not fetched.
 
 ## Representative records
 
@@ -122,9 +157,9 @@ investigation time, so the UI labels them neutrally and does not promise availab
 
 ## Coverage measurement
 
-The following structured-property counts are complete for the current FactGrid
-tablet class at the time checked; source-content classification is identified
-separately where it is sampled.
+The following are historical September 2026 measurements, not current corpus or
+document-family completeness claims. Source-content compatibility was sampled.
+The November evidence and generated artifact supersede the discovery strategy.
 
 - 152,633 tablet items were counted.
 - 1,472 items had P251, comprising 1,475 distinct local statements/references.

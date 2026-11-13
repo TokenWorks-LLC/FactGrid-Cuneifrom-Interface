@@ -23,6 +23,19 @@ live scholarly write has been performed.
 
 ## Acceptance evidence
 
+### Corpus and ATF boundary (13 November 2026)
+
+Read eligibility and editable-entity eligibility are separate predicates.
+The currently verified read-class closure and the legacy edit class both contain
+`Q512006` (Clay tablet). This does not grant writes: current provider identity,
+rights, grants, blocks, contributor policy, origin, CSRF, rate limits, target
+validation, base revisions, and readback confirmation remain mandatory.
+
+`CDLI-ATF-L-Q{qid}` is read-only even when its source uses a plain `<poem>`.
+The plain D-page splice contract does not apply to ATF. Discovery indexes and
+partial successful reads never authorize metadata or transcription mutations.
+No live scholarly edits were performed for this expansion.
+
 - Unit and contract tests cover parsing, authorization, metadata patching,
   creation/linking, conflicts, readback, attribution, partial outcomes, and recovery.
 - Deterministic Playwright tests cover signed-out access denial, eligible metadata, and creation

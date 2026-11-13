@@ -49,7 +49,6 @@ export const FACTGRID_PROPERTIES = Object.freeze({
 export const FACTGRID_LIMITS = Object.freeze({
   defaultPageSize: 20,
   maxPageSize: 25,
-  maxPage: 100,
   maxQueryLength: 100,
   maxDocumentPages: 12,
   maxWbgetentitiesBatch: 50,

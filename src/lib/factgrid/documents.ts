@@ -11,6 +11,7 @@ const SAFE_DOCUMENT_TITLE = /^[A-Za-z0-9][A-Za-z0-9_.() -]{0,180}$/;
 function editionKind(title: string, qid: Qid): EditionKind {
   if (title === `D-${qid}`) return "d";
   if (title === `CDLI-W-${qid}`) return "cdli";
+  if (title === `CDLI-ATF-L-${qid}`) return "atf";
   if (title === `ORACC-W-${qid}`) return "oracc";
   if (title === `UNICODE-W-${qid}`) return "unicode";
   return "other";
@@ -71,6 +72,8 @@ export function editionLabel(kind: EditionKind): string {
       return "Scholarly edition";
     case "cdli":
       return "CDLI transliteration";
+    case "atf":
+      return "CDLI ATF transliteration";
     case "oracc":
       return "ORACC transliteration";
     case "unicode":

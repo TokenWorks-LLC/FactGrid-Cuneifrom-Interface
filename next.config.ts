@@ -1,6 +1,12 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
+  env: {
+    // Public release provenance only; never include deployment secrets here.
+    FACTGRID_BUILD_REVISION: /^[a-f0-9]{40}$/u.test(process.env.FACTGRID_BUILD_REVISION ?? "")
+      ? process.env.FACTGRID_BUILD_REVISION!
+      : "unknown",
+  },
   serverExternalPackages: ["better-sqlite3"],
   images: {
     remotePatterns: [

@@ -1,0 +1,813 @@
+{
+    "success":  1,
+    "entities":  {
+                     "Q894483":  {
+                                     "pageid":  887578,
+                                     "ns":  120,
+                                     "title":  "Item:Q894483",
+                                     "lastrevid":  20736312,
+                                     "modified":  "2026-08-14T10:15:44Z",
+                                     "type":  "item",
+                                     "id":  "Q894483",
+                                     "labels":  {
+                                                    "en":  {
+                                                               "language":  "en",
+                                                               "value":  "Cuneiform Tablet HS 751"
+                                                           }
+                                                },
+                                     "claims":  {
+                                                    "P2":  [
+                                                               {
+                                                                   "mainsnak":  {
+                                                                                    "snaktype":  "value",
+                                                                                    "property":  "P2",
+                                                                                    "hash":  "08f72e9506527312741e41a4b2d05c64dc2c9eeb",
+                                                                                    "datavalue":  {
+                                                                                                      "value":  {
+                                                                                                                    "entity-type":  "item",
+                                                                                                                    "numeric-id":  512006,
+                                                                                                                    "id":  "Q512006"
+                                                                                                                },
+                                                                                                      "type":  "wikibase-entityid"
+                                                                                                  },
+                                                                                    "datatype":  "wikibase-item"
+                                                                                },
+                                                                   "type":  "statement",
+                                                                   "id":  "Q894483$4F194957-6FE9-4DF9-8CC5-CE9957594208",
+                                                                   "rank":  "normal"
+                                                               }
+                                                           ],
+                                                    "P747":  [
+                                                                 {
+                                                                     "mainsnak":  {
+                                                                                      "snaktype":  "value",
+                                                                                      "property":  "P747",
+                                                                                      "hash":  "927d61363025b9ae77b753054aa4659e4413286d",
+                                                                                      "datavalue":  {
+                                                                                                        "value":  {
+                                                                                                                      "entity-type":  "item",
+                                                                                                                      "numeric-id":  390181,
+                                                                                                                      "id":  "Q390181"
+                                                                                                                  },
+                                                                                                        "type":  "wikibase-entityid"
+                                                                                                    },
+                                                                                      "datatype":  "wikibase-item"
+                                                                                  },
+                                                                     "type":  "statement",
+                                                                     "id":  "Q894483$A1612878-3540-44F7-BA56-617C2F1DF7BC",
+                                                                     "rank":  "normal"
+                                                                 }
+                                                             ],
+                                                    "P131":  [
+                                                                 {
+                                                                     "mainsnak":  {
+                                                                                      "snaktype":  "value",
+                                                                                      "property":  "P131",
+                                                                                      "hash":  "8fc1904795a776673bc92876e71d363f63babe6a",
+                                                                                      "datavalue":  {
+                                                                                                        "value":  {
+                                                                                                                      "entity-type":  "item",
+                                                                                                                      "numeric-id":  893818,
+                                                                                                                      "id":  "Q893818"
+                                                                                                                  },
+                                                                                                        "type":  "wikibase-entityid"
+                                                                                                    },
+                                                                                      "datatype":  "wikibase-item"
+                                                                                  },
+                                                                     "type":  "statement",
+                                                                     "id":  "Q894483$FADF2C60-5EAC-4294-9C20-7E2553EE9812",
+                                                                     "rank":  "normal"
+                                                                 }
+                                                             ],
+                                                    "P64":  [
+                                                                {
+                                                                    "mainsnak":  {
+                                                                                     "snaktype":  "value",
+                                                                                     "property":  "P64",
+                                                                                     "hash":  "cc92ac71e526622e433a46b02cb2f2c82767eb45",
+                                                                                     "datavalue":  {
+                                                                                                       "value":  {
+                                                                                                                     "entity-type":  "item",
+                                                                                                                     "numeric-id":  893818,
+                                                                                                                     "id":  "Q893818"
+                                                                                                                 },
+                                                                                                       "type":  "wikibase-entityid"
+                                                                                                   },
+                                                                                     "datatype":  "wikibase-item"
+                                                                                 },
+                                                                    "type":  "statement",
+                                                                    "id":  "Q894483$5551DE7B-28AD-419E-964F-BF884A06B5EF",
+                                                                    "rank":  "normal"
+                                                                }
+                                                            ],
+                                                    "P692":  [
+                                                                 {
+                                                                     "mainsnak":  {
+                                                                                      "snaktype":  "value",
+                                                                                      "property":  "P692",
+                                                                                      "hash":  "9fd64dae87d291b62681901c2f85be06871a85ba",
+                                                                                      "datavalue":  {
+                                                                                                        "value":  "P020415",
+                                                                                                        "type":  "string"
+                                                                                                    },
+                                                                                      "datatype":  "external-id"
+                                                                                  },
+                                                                     "type":  "statement",
+                                                                     "id":  "Q894483$F05A1A45-BA43-4969-AA2F-56E12A33D164",
+                                                                     "rank":  "normal"
+                                                                 }
+                                                             ],
+                                                    "P329":  [
+                                                                 {
+                                                                     "mainsnak":  {
+                                                                                      "snaktype":  "value",
+                                                                                      "property":  "P329",
+                                                                                      "hash":  "b4d45fb0c0670798dd06596bd299ab4e7d35fcb1",
+                                                                                      "datavalue":  {
+                                                                                                        "value":  {
+                                                                                                                      "entity-type":  "item",
+                                                                                                                      "numeric-id":  21880,
+                                                                                                                      "id":  "Q21880"
+                                                                                                                  },
+                                                                                                        "type":  "wikibase-entityid"
+                                                                                                    },
+                                                                                      "datatype":  "wikibase-item"
+                                                                                  },
+                                                                     "type":  "statement",
+                                                                     "qualifiers":  {
+                                                                                        "P804":  [
+                                                                                                     {
+                                                                                                         "snaktype":  "value",
+                                                                                                         "property":  "P804",
+                                                                                                         "hash":  "f356c131a5ac274500537865d79e7e6ecd80c0ca",
+                                                                                                         "datavalue":  {
+                                                                                                                           "value":  "HS 751",
+                                                                                                                           "type":  "string"
+                                                                                                                       },
+                                                                                                         "datatype":  "string"
+                                                                                                     }
+                                                                                                 ],
+                                                                                        "P8":  [
+                                                                                                   {
+                                                                                                       "snaktype":  "value",
+                                                                                                       "property":  "P8",
+                                                                                                       "hash":  "6c8792b3d494b5b4ae0003117b04292fab8c83d0",
+                                                                                                       "datavalue":  {
+                                                                                                                         "value":  {
+                                                                                                                                       "entity-type":  "item",
+                                                                                                                                       "numeric-id":  511931,
+                                                                                                                                       "id":  "Q511931"
+                                                                                                                                   },
+                                                                                                                         "type":  "wikibase-entityid"
+                                                                                                                     },
+                                                                                                       "datatype":  "wikibase-item"
+                                                                                                   }
+                                                                                               ]
+                                                                                    },
+                                                                     "qualifiers-order":  [
+                                                                                              "P804",
+                                                                                              "P8"
+                                                                                          ],
+                                                                     "id":  "Q894483$70094041-7355-4D81-A17A-0B5764BD3310",
+                                                                     "rank":  "normal"
+                                                                 }
+                                                             ],
+                                                    "P18":  [
+                                                                {
+                                                                    "mainsnak":  {
+                                                                                     "snaktype":  "value",
+                                                                                     "property":  "P18",
+                                                                                     "hash":  "259d6c445d491126d6f2bb42b5324cec56d88e52",
+                                                                                     "datavalue":  {
+                                                                                                       "value":  {
+                                                                                                                     "entity-type":  "item",
+                                                                                                                     "numeric-id":  471149,
+                                                                                                                     "id":  "Q471149"
+                                                                                                                 },
+                                                                                                       "type":  "wikibase-entityid"
+                                                                                                   },
+                                                                                     "datatype":  "wikibase-item"
+                                                                                 },
+                                                                    "type":  "statement",
+                                                                    "id":  "Q894483$82ACCB6D-4307-4A9F-B38B-2937C4B1A88C",
+                                                                    "rank":  "normal"
+                                                                }
+                                                            ],
+                                                    "P121":  [
+                                                                 {
+                                                                     "mainsnak":  {
+                                                                                      "snaktype":  "value",
+                                                                                      "property":  "P121",
+                                                                                      "hash":  "b4bbc16f86cb5d7ae7199da4ca1ce133fbf7ad68",
+                                                                                      "datavalue":  {
+                                                                                                        "value":  {
+                                                                                                                      "entity-type":  "item",
+                                                                                                                      "numeric-id":  516473,
+                                                                                                                      "id":  "Q516473"
+                                                                                                                  },
+                                                                                                        "type":  "wikibase-entityid"
+                                                                                                    },
+                                                                                      "datatype":  "wikibase-item"
+                                                                                  },
+                                                                     "type":  "statement",
+                                                                     "id":  "Q894483$36D7B9BE-AD7B-43B8-9FAA-9A590F819A04",
+                                                                     "rank":  "normal"
+                                                                 }
+                                                             ],
+                                                    "P480":  [
+                                                                 {
+                                                                     "mainsnak":  {
+                                                                                      "snaktype":  "value",
+                                                                                      "property":  "P480",
+                                                                                      "hash":  "5a84516579b47b8364fa634bc8f6f08543ce3195",
+                                                                                      "datavalue":  {
+                                                                                                        "value":  {
+                                                                                                                      "entity-type":  "item",
+                                                                                                                      "numeric-id":  471153,
+                                                                                                                      "id":  "Q471153"
+                                                                                                                  },
+                                                                                                        "type":  "wikibase-entityid"
+                                                                                                    },
+                                                                                      "datatype":  "wikibase-item"
+                                                                                  },
+                                                                     "type":  "statement",
+                                                                     "id":  "Q894483$CA8C6FF1-3C95-4F6A-A519-4EE70E18600B",
+                                                                     "rank":  "normal"
+                                                                 }
+                                                             ],
+                                                    "P401":  [
+                                                                 {
+                                                                     "mainsnak":  {
+                                                                                      "snaktype":  "value",
+                                                                                      "property":  "P401",
+                                                                                      "hash":  "f07f63855c088e332ced1e0ab741468e35dbb610",
+                                                                                      "datavalue":  {
+                                                                                                        "value":  {
+                                                                                                                      "entity-type":  "item",
+                                                                                                                      "numeric-id":  471153,
+                                                                                                                      "id":  "Q471153"
+                                                                                                                  },
+                                                                                                        "type":  "wikibase-entityid"
+                                                                                                    },
+                                                                                      "datatype":  "wikibase-item"
+                                                                                  },
+                                                                     "type":  "statement",
+                                                                     "id":  "Q894483$473A32D8-11E4-4800-A7E9-B82F5E003467",
+                                                                     "rank":  "normal"
+                                                                 }
+                                                             ],
+                                                    "P695":  [
+                                                                 {
+                                                                     "mainsnak":  {
+                                                                                      "snaktype":  "value",
+                                                                                      "property":  "P695",
+                                                                                      "hash":  "e19765e21576162a1af4ee995e8397fa9ef91a45",
+                                                                                      "datavalue":  {
+                                                                                                        "value":  {
+                                                                                                                      "entity-type":  "item",
+                                                                                                                      "numeric-id":  390017,
+                                                                                                                      "id":  "Q390017"
+                                                                                                                  },
+                                                                                                        "type":  "wikibase-entityid"
+                                                                                                    },
+                                                                                      "datatype":  "wikibase-item"
+                                                                                  },
+                                                                     "type":  "statement",
+                                                                     "id":  "Q894483$9D082561-8004-49CA-857B-32E66C91ADE0",
+                                                                     "rank":  "normal"
+                                                                 }
+                                                             ],
+                                                    "P853":  [
+                                                                 {
+                                                                     "mainsnak":  {
+                                                                                      "snaktype":  "value",
+                                                                                      "property":  "P853",
+                                                                                      "hash":  "44cc31489416f2e5d47a49339ced20cdc2c1a017",
+                                                                                      "datavalue":  {
+                                                                                                        "value":  {
+                                                                                                                      "entity-type":  "item",
+                                                                                                                      "numeric-id":  512142,
+                                                                                                                      "id":  "Q512142"
+                                                                                                                  },
+                                                                                                        "type":  "wikibase-entityid"
+                                                                                                    },
+                                                                                      "datatype":  "wikibase-item"
+                                                                                  },
+                                                                     "type":  "statement",
+                                                                     "id":  "Q894483$9984B53A-B2BD-4A35-AE12-EBD9461F002F",
+                                                                     "rank":  "normal"
+                                                                 }
+                                                             ],
+                                                    "P138":  [
+                                                                 {
+                                                                     "mainsnak":  {
+                                                                                      "snaktype":  "value",
+                                                                                      "property":  "P138",
+                                                                                      "hash":  "622c2384abd44b53f4811fb18404e246d0d29803",
+                                                                                      "datavalue":  {
+                                                                                                        "value":  "https://doi.org/10.11588/HEIDICON/1126431",
+                                                                                                        "type":  "string"
+                                                                                                    },
+                                                                                      "datatype":  "url"
+                                                                                  },
+                                                                     "type":  "statement",
+                                                                     "id":  "Q894483$39DC7575-F6F6-42C8-968B-28E05737DAE6",
+                                                                     "rank":  "normal"
+                                                                 }
+                                                             ],
+                                                    "P634":  [
+                                                                 {
+                                                                     "mainsnak":  {
+                                                                                      "snaktype":  "value",
+                                                                                      "property":  "P634",
+                                                                                      "hash":  "05fc3bbe7ebd835abfd0dca52f191f6be9196f06",
+                                                                                      "datavalue":  {
+                                                                                                        "value":  "10.11588/HEIDICON/1126431",
+                                                                                                        "type":  "string"
+                                                                                                    },
+                                                                                      "datatype":  "external-id"
+                                                                                  },
+                                                                     "type":  "statement",
+                                                                     "id":  "Q894483$B2CE201C-06E6-45D5-8516-05790AB4AE0D",
+                                                                     "rank":  "normal"
+                                                                 }
+                                                             ],
+                                                    "P188":  [
+                                                                 {
+                                                                     "mainsnak":  {
+                                                                                      "snaktype":  "value",
+                                                                                      "property":  "P188",
+                                                                                      "hash":  "e847d841c364efe4b059e5d0a5bf8e380236b000",
+                                                                                      "datavalue":  {
+                                                                                                        "value":  "https://heidicon.ub.uni-heidelberg.de/iiif/2/1125509:589829/full/full/0/default.png",
+                                                                                                        "type":  "string"
+                                                                                                    },
+                                                                                      "datatype":  "url"
+                                                                                  },
+                                                                     "type":  "statement",
+                                                                     "qualifiers":  {
+                                                                                        "P1029":  [
+                                                                                                      {
+                                                                                                          "snaktype":  "value",
+                                                                                                          "property":  "P1029",
+                                                                                                          "hash":  "9ceb92be854759851f218935c89b9074f6172a52",
+                                                                                                          "datavalue":  {
+                                                                                                                            "value":  {
+                                                                                                                                          "entity-type":  "item",
+                                                                                                                                          "numeric-id":  743328,
+                                                                                                                                          "id":  "Q743328"
+                                                                                                                                      },
+                                                                                                                            "type":  "wikibase-entityid"
+                                                                                                                        },
+                                                                                                          "datatype":  "wikibase-item"
+                                                                                                      }
+                                                                                                  ],
+                                                                                        "P15":  [
+                                                                                                    {
+                                                                                                        "snaktype":  "value",
+                                                                                                        "property":  "P15",
+                                                                                                        "hash":  "054aadd0149965cf409b9216ba373dddee97f89b",
+                                                                                                        "datavalue":  {
+                                                                                                                          "value":  {
+                                                                                                                                        "entity-type":  "item",
+                                                                                                                                        "numeric-id":  893157,
+                                                                                                                                        "id":  "Q893157"
+                                                                                                                                    },
+                                                                                                                          "type":  "wikibase-entityid"
+                                                                                                                      },
+                                                                                                        "datatype":  "wikibase-item"
+                                                                                                    }
+                                                                                                ]
+                                                                                    },
+                                                                     "qualifiers-order":  [
+                                                                                              "P1029",
+                                                                                              "P15"
+                                                                                          ],
+                                                                     "id":  "Q894483$F6CC2F5E-8CA6-4147-BB6D-B8573A0280F2",
+                                                                     "rank":  "normal"
+                                                                 },
+                                                                 {
+                                                                     "mainsnak":  {
+                                                                                      "snaktype":  "value",
+                                                                                      "property":  "P188",
+                                                                                      "hash":  "d878081839a6cf5c29fdbda38296e13dd3d31d68",
+                                                                                      "datavalue":  {
+                                                                                                        "value":  "https://heidicon.ub.uni-heidelberg.de/iiif/2/1125510:589830/full/full/0/default.png",
+                                                                                                        "type":  "string"
+                                                                                                    },
+                                                                                      "datatype":  "url"
+                                                                                  },
+                                                                     "type":  "statement",
+                                                                     "qualifiers":  {
+                                                                                        "P1029":  [
+                                                                                                      {
+                                                                                                          "snaktype":  "value",
+                                                                                                          "property":  "P1029",
+                                                                                                          "hash":  "bf27e9792afb1605cfd2b644e2f8516233649a14",
+                                                                                                          "datavalue":  {
+                                                                                                                            "value":  {
+                                                                                                                                          "entity-type":  "item",
+                                                                                                                                          "numeric-id":  743326,
+                                                                                                                                          "id":  "Q743326"
+                                                                                                                                      },
+                                                                                                                            "type":  "wikibase-entityid"
+                                                                                                                        },
+                                                                                                          "datatype":  "wikibase-item"
+                                                                                                      }
+                                                                                                  ],
+                                                                                        "P15":  [
+                                                                                                    {
+                                                                                                        "snaktype":  "value",
+                                                                                                        "property":  "P15",
+                                                                                                        "hash":  "054aadd0149965cf409b9216ba373dddee97f89b",
+                                                                                                        "datavalue":  {
+                                                                                                                          "value":  {
+                                                                                                                                        "entity-type":  "item",
+                                                                                                                                        "numeric-id":  893157,
+                                                                                                                                        "id":  "Q893157"
+                                                                                                                                    },
+                                                                                                                          "type":  "wikibase-entityid"
+                                                                                                                      },
+                                                                                                        "datatype":  "wikibase-item"
+                                                                                                    }
+                                                                                                ]
+                                                                                    },
+                                                                     "qualifiers-order":  [
+                                                                                              "P1029",
+                                                                                              "P15"
+                                                                                          ],
+                                                                     "id":  "Q894483$9C5F620C-CA50-4E5E-89F5-FD21DEA44F93",
+                                                                     "rank":  "normal"
+                                                                 },
+                                                                 {
+                                                                     "mainsnak":  {
+                                                                                      "snaktype":  "value",
+                                                                                      "property":  "P188",
+                                                                                      "hash":  "619360d94f39b5366c23c3b5720b6b3f1c7026f1",
+                                                                                      "datavalue":  {
+                                                                                                        "value":  "https://heidicon.ub.uni-heidelberg.de/iiif/2/1125511:589831/full/full/0/default.png",
+                                                                                                        "type":  "string"
+                                                                                                    },
+                                                                                      "datatype":  "url"
+                                                                                  },
+                                                                     "type":  "statement",
+                                                                     "qualifiers":  {
+                                                                                        "P1029":  [
+                                                                                                      {
+                                                                                                          "snaktype":  "value",
+                                                                                                          "property":  "P1029",
+                                                                                                          "hash":  "a89df6bdd1ebc8d20c485a0340410e01d9c46400",
+                                                                                                          "datavalue":  {
+                                                                                                                            "value":  {
+                                                                                                                                          "entity-type":  "item",
+                                                                                                                                          "numeric-id":  743323,
+                                                                                                                                          "id":  "Q743323"
+                                                                                                                                      },
+                                                                                                                            "type":  "wikibase-entityid"
+                                                                                                                        },
+                                                                                                          "datatype":  "wikibase-item"
+                                                                                                      }
+                                                                                                  ],
+                                                                                        "P15":  [
+                                                                                                    {
+                                                                                                        "snaktype":  "value",
+                                                                                                        "property":  "P15",
+                                                                                                        "hash":  "054aadd0149965cf409b9216ba373dddee97f89b",
+                                                                                                        "datavalue":  {
+                                                                                                                          "value":  {
+                                                                                                                                        "entity-type":  "item",
+                                                                                                                                        "numeric-id":  893157,
+                                                                                                                                        "id":  "Q893157"
+                                                                                                                                    },
+                                                                                                                          "type":  "wikibase-entityid"
+                                                                                                                      },
+                                                                                                        "datatype":  "wikibase-item"
+                                                                                                    }
+                                                                                                ]
+                                                                                    },
+                                                                     "qualifiers-order":  [
+                                                                                              "P1029",
+                                                                                              "P15"
+                                                                                          ],
+                                                                     "id":  "Q894483$9894A3CB-02BE-4001-AC10-BBA5BAF8636E",
+                                                                     "rank":  "normal"
+                                                                 },
+                                                                 {
+                                                                     "mainsnak":  {
+                                                                                      "snaktype":  "value",
+                                                                                      "property":  "P188",
+                                                                                      "hash":  "7e2ebed3ebd312d538fda64673f1caf2858b0e6f",
+                                                                                      "datavalue":  {
+                                                                                                        "value":  "https://heidicon.ub.uni-heidelberg.de/iiif/2/1125512:589832/full/full/0/default.png",
+                                                                                                        "type":  "string"
+                                                                                                    },
+                                                                                      "datatype":  "url"
+                                                                                  },
+                                                                     "type":  "statement",
+                                                                     "qualifiers":  {
+                                                                                        "P1029":  [
+                                                                                                      {
+                                                                                                          "snaktype":  "value",
+                                                                                                          "property":  "P1029",
+                                                                                                          "hash":  "b26f2a94c2936ac78e68db0573711a69b2677092",
+                                                                                                          "datavalue":  {
+                                                                                                                            "value":  {
+                                                                                                                                          "entity-type":  "item",
+                                                                                                                                          "numeric-id":  743327,
+                                                                                                                                          "id":  "Q743327"
+                                                                                                                                      },
+                                                                                                                            "type":  "wikibase-entityid"
+                                                                                                                        },
+                                                                                                          "datatype":  "wikibase-item"
+                                                                                                      }
+                                                                                                  ],
+                                                                                        "P15":  [
+                                                                                                    {
+                                                                                                        "snaktype":  "value",
+                                                                                                        "property":  "P15",
+                                                                                                        "hash":  "054aadd0149965cf409b9216ba373dddee97f89b",
+                                                                                                        "datavalue":  {
+                                                                                                                          "value":  {
+                                                                                                                                        "entity-type":  "item",
+                                                                                                                                        "numeric-id":  893157,
+                                                                                                                                        "id":  "Q893157"
+                                                                                                                                    },
+                                                                                                                          "type":  "wikibase-entityid"
+                                                                                                                      },
+                                                                                                        "datatype":  "wikibase-item"
+                                                                                                    }
+                                                                                                ]
+                                                                                    },
+                                                                     "qualifiers-order":  [
+                                                                                              "P1029",
+                                                                                              "P15"
+                                                                                          ],
+                                                                     "id":  "Q894483$0221320F-0D3E-4F94-8D8E-D6848651A3F1",
+                                                                     "rank":  "normal"
+                                                                 },
+                                                                 {
+                                                                     "mainsnak":  {
+                                                                                      "snaktype":  "value",
+                                                                                      "property":  "P188",
+                                                                                      "hash":  "4c6bb4c0ee8bfca0ea1bfd9eff8b7e3de41f15b3",
+                                                                                      "datavalue":  {
+                                                                                                        "value":  "https://heidicon.ub.uni-heidelberg.de/iiif/2/1125513:589833/full/full/0/default.png",
+                                                                                                        "type":  "string"
+                                                                                                    },
+                                                                                      "datatype":  "url"
+                                                                                  },
+                                                                     "type":  "statement",
+                                                                     "qualifiers":  {
+                                                                                        "P1029":  [
+                                                                                                      {
+                                                                                                          "snaktype":  "value",
+                                                                                                          "property":  "P1029",
+                                                                                                          "hash":  "6ceaa37c668a1f525f92d89e0591bdca07a1025e",
+                                                                                                          "datavalue":  {
+                                                                                                                            "value":  {
+                                                                                                                                          "entity-type":  "item",
+                                                                                                                                          "numeric-id":  743329,
+                                                                                                                                          "id":  "Q743329"
+                                                                                                                                      },
+                                                                                                                            "type":  "wikibase-entityid"
+                                                                                                                        },
+                                                                                                          "datatype":  "wikibase-item"
+                                                                                                      }
+                                                                                                  ],
+                                                                                        "P15":  [
+                                                                                                    {
+                                                                                                        "snaktype":  "value",
+                                                                                                        "property":  "P15",
+                                                                                                        "hash":  "054aadd0149965cf409b9216ba373dddee97f89b",
+                                                                                                        "datavalue":  {
+                                                                                                                          "value":  {
+                                                                                                                                        "entity-type":  "item",
+                                                                                                                                        "numeric-id":  893157,
+                                                                                                                                        "id":  "Q893157"
+                                                                                                                                    },
+                                                                                                                          "type":  "wikibase-entityid"
+                                                                                                                      },
+                                                                                                        "datatype":  "wikibase-item"
+                                                                                                    }
+                                                                                                ]
+                                                                                    },
+                                                                     "qualifiers-order":  [
+                                                                                              "P1029",
+                                                                                              "P15"
+                                                                                          ],
+                                                                     "id":  "Q894483$4EDA34BE-EEAD-4D2D-90AD-3EEEDEE0C27F",
+                                                                     "rank":  "normal"
+                                                                 },
+                                                                 {
+                                                                     "mainsnak":  {
+                                                                                      "snaktype":  "value",
+                                                                                      "property":  "P188",
+                                                                                      "hash":  "8c0341ed4d5fd20cfbe6afa28b46eeecac51f580",
+                                                                                      "datavalue":  {
+                                                                                                        "value":  "https://heidicon.ub.uni-heidelberg.de/iiif/2/1125514:589834/full/full/0/default.png",
+                                                                                                        "type":  "string"
+                                                                                                    },
+                                                                                      "datatype":  "url"
+                                                                                  },
+                                                                     "type":  "statement",
+                                                                     "qualifiers":  {
+                                                                                        "P1029":  [
+                                                                                                      {
+                                                                                                          "snaktype":  "value",
+                                                                                                          "property":  "P1029",
+                                                                                                          "hash":  "942890df2cd7ea89ef7542460be828f1b37a6e3b",
+                                                                                                          "datavalue":  {
+                                                                                                                            "value":  {
+                                                                                                                                          "entity-type":  "item",
+                                                                                                                                          "numeric-id":  743324,
+                                                                                                                                          "id":  "Q743324"
+                                                                                                                                      },
+                                                                                                                            "type":  "wikibase-entityid"
+                                                                                                                        },
+                                                                                                          "datatype":  "wikibase-item"
+                                                                                                      }
+                                                                                                  ],
+                                                                                        "P15":  [
+                                                                                                    {
+                                                                                                        "snaktype":  "value",
+                                                                                                        "property":  "P15",
+                                                                                                        "hash":  "054aadd0149965cf409b9216ba373dddee97f89b",
+                                                                                                        "datavalue":  {
+                                                                                                                          "value":  {
+                                                                                                                                        "entity-type":  "item",
+                                                                                                                                        "numeric-id":  893157,
+                                                                                                                                        "id":  "Q893157"
+                                                                                                                                    },
+                                                                                                                          "type":  "wikibase-entityid"
+                                                                                                                      },
+                                                                                                        "datatype":  "wikibase-item"
+                                                                                                    }
+                                                                                                ]
+                                                                                    },
+                                                                     "qualifiers-order":  [
+                                                                                              "P1029",
+                                                                                              "P15"
+                                                                                          ],
+                                                                     "id":  "Q894483$074E78DE-9753-47F1-89A0-2847D74A27A7",
+                                                                     "rank":  "normal"
+                                                                 }
+                                                             ],
+                                                    "P60":  [
+                                                                {
+                                                                    "mainsnak":  {
+                                                                                     "snaktype":  "value",
+                                                                                     "property":  "P60",
+                                                                                     "hash":  "e185fbca1e09058cb4cea535dfbc3e77e50de9ba",
+                                                                                     "datavalue":  {
+                                                                                                       "value":  {
+                                                                                                                     "amount":  "+5.1",
+                                                                                                                     "unit":  "https://database.factgrid.de/entity/Q102135"
+                                                                                                                 },
+                                                                                                       "type":  "quantity"
+                                                                                                   },
+                                                                                     "datatype":  "quantity"
+                                                                                 },
+                                                                    "type":  "statement",
+                                                                    "id":  "Q894483$891118D7-65F7-4DE7-8E41-41B667E3CBB0",
+                                                                    "rank":  "normal"
+                                                                }
+                                                            ],
+                                                    "P59":  [
+                                                                {
+                                                                    "mainsnak":  {
+                                                                                     "snaktype":  "value",
+                                                                                     "property":  "P59",
+                                                                                     "hash":  "d91c72eabe0b7d2cb7a4d1abcc123348075f1603",
+                                                                                     "datavalue":  {
+                                                                                                       "value":  {
+                                                                                                                     "amount":  "+5.9",
+                                                                                                                     "unit":  "https://database.factgrid.de/entity/Q102135"
+                                                                                                                 },
+                                                                                                       "type":  "quantity"
+                                                                                                   },
+                                                                                     "datatype":  "quantity"
+                                                                                 },
+                                                                    "type":  "statement",
+                                                                    "id":  "Q894483$4667D894-F94F-42D3-A173-65ECDEA4E0E4",
+                                                                    "rank":  "normal"
+                                                                }
+                                                            ],
+                                                    "P61":  [
+                                                                {
+                                                                    "mainsnak":  {
+                                                                                     "snaktype":  "value",
+                                                                                     "property":  "P61",
+                                                                                     "hash":  "6b176036c01be7e3dc3d121b6b1cb57b73eb7e99",
+                                                                                     "datavalue":  {
+                                                                                                       "value":  {
+                                                                                                                     "amount":  "+1.9",
+                                                                                                                     "unit":  "https://database.factgrid.de/entity/Q102135"
+                                                                                                                 },
+                                                                                                       "type":  "quantity"
+                                                                                                   },
+                                                                                     "datatype":  "quantity"
+                                                                                 },
+                                                                    "type":  "statement",
+                                                                    "id":  "Q894483$8EB35EB2-B858-464A-A5F4-F0AC2CA8E1B5",
+                                                                    "rank":  "normal"
+                                                                }
+                                                            ],
+                                                    "P1091":  [
+                                                                  {
+                                                                      "mainsnak":  {
+                                                                                       "snaktype":  "value",
+                                                                                       "property":  "P1091",
+                                                                                       "hash":  "20e242a2a2fe2d1a0298288390bfe2bce1232ae0",
+                                                                                       "datavalue":  {
+                                                                                                         "value":  {
+                                                                                                                       "amount":  "+35.31",
+                                                                                                                       "unit":  "https://database.factgrid.de/entity/Q898122"
+                                                                                                                   },
+                                                                                                         "type":  "quantity"
+                                                                                                     },
+                                                                                       "datatype":  "quantity"
+                                                                                   },
+                                                                      "type":  "statement",
+                                                                      "id":  "Q894483$37A51BAB-1351-4E61-AABF-2A26087FE91E",
+                                                                      "rank":  "normal"
+                                                                  }
+                                                              ],
+                                                    "P1020":  [
+                                                                  {
+                                                                      "mainsnak":  {
+                                                                                       "snaktype":  "value",
+                                                                                       "property":  "P1020",
+                                                                                       "hash":  "718d2a439a11bdc6e44c30b3ad1956bc63322d21",
+                                                                                       "datavalue":  {
+                                                                                                         "value":  {
+                                                                                                                       "amount":  "+74.69",
+                                                                                                                       "unit":  "https://database.factgrid.de/entity/Q898160"
+                                                                                                                   },
+                                                                                                         "type":  "quantity"
+                                                                                                     },
+                                                                                       "datatype":  "quantity"
+                                                                                   },
+                                                                      "type":  "statement",
+                                                                      "id":  "Q894483$1A597E41-3D3C-4642-8312-E6FE720706D9",
+                                                                      "rank":  "normal"
+                                                                  }
+                                                              ],
+                                                    "P1034":  [
+                                                                  {
+                                                                      "mainsnak":  {
+                                                                                       "snaktype":  "value",
+                                                                                       "property":  "P1034",
+                                                                                       "hash":  "dec9c3e09cb348ebbcee6822306a542164883b6a",
+                                                                                       "datavalue":  {
+                                                                                                         "value":  "https://heidicon.ub.uni-heidelberg.de/eas/partitions/3/0/589000/589828/127f056c377eb78a56cd4c08dc769ee2762cb1a9/application/x-ply/HS_751_HeiCuBeDa_GigaMesh.ply",
+                                                                                                         "type":  "string"
+                                                                                                     },
+                                                                                       "datatype":  "url"
+                                                                                   },
+                                                                      "type":  "statement",
+                                                                      "qualifiers":  {
+                                                                                         "P903":  [
+                                                                                                      {
+                                                                                                          "snaktype":  "value",
+                                                                                                          "property":  "P903",
+                                                                                                          "hash":  "99deaf43f96a62b672bb23909044e7405c72a089",
+                                                                                                          "datavalue":  {
+                                                                                                                            "value":  {
+                                                                                                                                          "entity-type":  "item",
+                                                                                                                                          "numeric-id":  1355709,
+                                                                                                                                          "id":  "Q1355709"
+                                                                                                                                      },
+                                                                                                                            "type":  "wikibase-entityid"
+                                                                                                                        },
+                                                                                                          "datatype":  "wikibase-item"
+                                                                                                      }
+                                                                                                  ]
+                                                                                     },
+                                                                      "qualifiers-order":  [
+                                                                                               "P903"
+                                                                                           ],
+                                                                      "id":  "Q894483$76F1F0B6-86F0-4FD6-93C5-808FB9B50B8B",
+                                                                      "rank":  "normal"
+                                                                  }
+                                                              ],
+                                                    "P251":  [
+                                                                 {
+                                                                     "mainsnak":  {
+                                                                                      "snaktype":  "value",
+                                                                                      "property":  "P251",
+                                                                                      "hash":  "5271dd54835fda8980c7196dd96820a7027d25a3",
+                                                                                      "datavalue":  {
+                                                                                                        "value":  "https://database.factgrid.de/wiki/CDLI-ATF-L-Q894483",
+                                                                                                        "type":  "string"
+                                                                                                    },
+                                                                                      "datatype":  "url"
+                                                                                  },
+                                                                     "type":  "statement",
+                                                                     "id":  "Q894483$0ACD95A8-BDFF-4584-BE3C-7104AB8745D0",
+                                                                     "rank":  "normal"
+                                                                 }
+                                                             ]
+                                                }
+                                 }
+                 }
+}

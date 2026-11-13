@@ -1,0 +1,26 @@
+{
+    "batchcomplete":  true,
+    "query":  {
+                  "pages":  [
+                                {
+                                    "pageid":  1994314,
+                                    "ns":  0,
+                                    "title":  "CDLI-ATF-L-Q894483",
+                                    "revisions":  [
+                                                      {
+                                                          "revid":  20109826,
+                                                          "parentid":  0,
+                                                          "timestamp":  "2026-06-15T16:48:55Z",
+                                                          "slots":  {
+                                                                        "main":  {
+                                                                                     "contentmodel":  "wikitext",
+                                                                                     "contentformat":  "text/x-wiki",
+                                                                                     "content":  "{{Template:CuneiformInfoBox|894483}}\n* \u0027\u0027\u0027FactGrid ID:\u0027\u0027\u0027 [[Item:Q894483]]\n\n\u003cpoem\u003e\n\u0026P020415 = TMH 5, 001 \n#version: 0.6 \n#atf: lang sux \n@tablet \n@obverse \n@column 1 \n1. 1(asz@c) ur-{d}{sze3}szer7-da \n2. dumu ur-lugal-ra \n3. 1(asz@c) lu:gal-kar \n4. dumu ur-{d}iszkur \n5. 1(asz@c) lu2-he2-gal2 \n6. dumu ur-sa6-ga \n7. 1(asz@c) a-ul4-gal \n@column 2 \n1. dumu AN-lu2-mah \n2. 1(asz@c) ur-{d}inanna \n3. dumu e2-gissu-bi \n4. 1(asz@c) {d}inanna-ur-sag \n5. dumu szesz-ama-na \n6. 1(asz@c) e2-ur2-be6-du10 \n7. dumu [x x x] \n@reverse \n@column 1 \n1. 1(asz@c) usz-bum \n2. dumu-gi7-ra \n3. 1(asz@c) lu:gal-ug3-ga2 \n4. dumu {d}inanna-ur-sag \n5. 1(asz@c) dumu a-kiszi17-gal\n\u003c/poem\u003e\n\n\u003cbr/\u003e\u003cbr/\u003e\u003cbr/\u003e\u003cbr/\u003e\n{{Template:CuneiformImageFC|894483}}"
+                                                                                 }
+                                                                    }
+                                                      }
+                                                  ]
+                                }
+                            ]
+              }
+}

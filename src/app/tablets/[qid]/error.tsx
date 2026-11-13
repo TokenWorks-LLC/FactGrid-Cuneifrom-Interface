@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useTransition } from "react";
 import Link from "next/link";
 import { AlertTriangle, RotateCcw } from "lucide-react";
 import { usePathname } from "next/navigation";
@@ -11,11 +11,12 @@ import { cn } from "@/lib/utils";
 
 export default function TabletError({
   error,
-  reset,
+  retry,
 }: {
   error: Error & { digest?: string };
-  reset: () => void;
+  retry: () => void;
 }) {
+  const [pending, startTransition] = useTransition();
   const pathname = usePathname();
   const qid = pathname.match(/\/tablets\/(Q[1-9][0-9]{0,14})(?:\/|$)/iu)?.[1]?.toUpperCase();
 
@@ -41,9 +42,9 @@ export default function TabletError({
           record.
         </p>
         <div className="mt-7 flex flex-wrap gap-3">
-          <Button className="min-h-11 rounded-none px-4" onClick={reset} type="button">
+          <Button className="min-h-11 rounded-none px-4" disabled={pending} onClick={() => startTransition(() => retry())} type="button">
             <RotateCcw aria-hidden="true" className="size-4" />
-            Try again
+            {pending ? "Trying again…" : "Try again"}
           </Button>
           {qid ? (
             <a

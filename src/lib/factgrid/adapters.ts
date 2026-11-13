@@ -1,11 +1,11 @@
 import {
-  CUNEIFORM_CATALOGUE_QID,
   FACTGRID,
   FACTGRID_LIMITS,
   FACTGRID_PROPERTIES,
 } from "./constants";
 import { editionLabel, resolveFactGridDocumentUrl } from "./documents";
 import { FactGridError } from "./errors";
+import { entityIsReadableTablet } from "./eligibility";
 import type {
   DimensionValue,
   DocumentRevision,
@@ -299,7 +299,7 @@ function dimensions(entity: WikibaseEntity, labels: LabelMap): DimensionValue[] 
 }
 
 export function entityIsCuneiformTablet(entity: WikibaseEntity): boolean {
-  return entityQids(entity, FACTGRID_PROPERTIES.membership).includes(CUNEIFORM_CATALOGUE_QID);
+  return entityIsReadableTablet(entity);
 }
 
 export function collectReferencedQids(entity: WikibaseEntity): Qid[] {
@@ -437,7 +437,16 @@ export function adaptDocumentRevision(
   page: MediaWikiPage | undefined,
 ): TabletEdition {
   if (!edition.reference) return edition;
-  if (!page || page.missing || page.invalid) {
+  if (!page || page.invalid || page.title?.replaceAll("_", " ") !== edition.reference.title || page.ns !== 0) {
+    return {
+      ...edition,
+      status: "error",
+      errorCode: "UPSTREAM_PROTOCOL",
+      retryable: true,
+      reason: "FactGrid returned invalid page information for this edition.",
+    };
+  }
+  if (page.missing) {
     return { ...edition, status: "missing", reason: "FactGrid reports that this page is missing." };
   }
 
@@ -445,19 +454,26 @@ export function adaptDocumentRevision(
   const slot = rawRevision?.slots?.main;
   if (
     !rawRevision ||
-    typeof rawRevision.revid !== "number" ||
-    typeof rawRevision.parentid !== "number" ||
+    !Number.isSafeInteger(rawRevision.revid) || (rawRevision.revid ?? 0) <= 0 ||
+    !Number.isSafeInteger(rawRevision.parentid) || (rawRevision.parentid ?? -1) < 0 ||
     typeof rawRevision.timestamp !== "string" ||
+    !Number.isFinite(Date.parse(rawRevision.timestamp)) ||
     typeof slot?.content !== "string" ||
     typeof slot.contentmodel !== "string" ||
     typeof slot.contentformat !== "string"
   ) {
-    return { ...edition, status: "unsupported", reason: "The page has no readable current revision." };
+    return {
+      ...edition,
+      status: "error",
+      errorCode: "UPSTREAM_PROTOCOL",
+      retryable: true,
+      reason: "FactGrid returned an incomplete current revision for this edition.",
+    };
   }
 
   const revision: DocumentRevision = {
-    revisionId: rawRevision.revid,
-    parentRevisionId: rawRevision.parentid,
+    revisionId: rawRevision.revid as number,
+    parentRevisionId: rawRevision.parentid as number,
     timestamp: rawRevision.timestamp,
     contentModel: slot.contentmodel,
     contentFormat: slot.contentformat,

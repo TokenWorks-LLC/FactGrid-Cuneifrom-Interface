@@ -3,8 +3,9 @@
 ## Shape
 
 The application is one Next.js service. Server components render public pages;
-route handlers own OAuth, session state, and writes. There is no local copy of
-the catalogue, search index, user database, or scholarly revision store.
+route handlers own OAuth, session state, and writes. A compact, read-only discovery
+artifact holds identifiers, search terms, and facet values. There is no local
+scholarly text store, editable entity replica, or user account database.
 
 ```text
 Browser
@@ -15,9 +16,9 @@ Browser
                      └─ write service ──────> MediaWiki Action API
 ```
 
-Public and private data paths stay separate. Public entity/document reads use a
-short Next.js revalidation window; arbitrary search requests bypass the persistent
-Next cache. `/api/session`, OAuth responses, and writes are always private and
+Public and private data paths stay separate. Core public entity reads use a
+short Next.js revalidation window; optional document/label and arbitrary search
+requests bypass the persistent Next cache. `/api/session`, OAuth responses, and writes are always private and
 `no-store`. A successful write invalidates the affected tablet route.
 
 ## Public reads
@@ -25,23 +26,42 @@ Next cache. `/api/session`, OAuth responses, and writes are always private and
 `src/lib/factgrid` centralizes fixed endpoints, property mappings, validation,
 adapters, and source-format rules. It:
 
-1. asks CirrusSearch for Item-namespace results with `P2=Q512006` and selected
-   facet clauses already applied;
-2. batch-loads authoritative entities and rechecks current, non-deprecated
-   catalogue membership;
-3. batch-loads labels for referenced entities;
-4. resolves bounded P251 document links to exact FactGrid titles and reads their
-   current revisions;
-5. derives contextual collection, findspot, and period choices from structured
-   values on the current result page and searches FactGrid entity names on demand
-   for additional values, then pushes a selected QID back into the Cirrus
-   membership query before pagination;
+1. applies text and six facet filters to a validated, policy-versioned discovery
+   index before pagination, using strict QID ordering; without an index it uses
+   explicitly incomplete CirrusSearch and its 10,000-result window;
+2. batch-loads authoritative entities and rechecks active tablet membership and
+   current filters; stale entries leave page holes without repeating later items;
+3. resolves optional related labels independently, retaining linked QIDs and a
+   warning if label requests fail;
+4. resolves only bounded, linked P251 documents with exact same-record titles;
+   missing, unsupported, malformed, and unavailable editions keep their positions
+   and source links without hiding metadata or other editions;
+5. searches catalogue-wide facet values with readable labels and bounded option
+   pages; contextual/general-name fallback is explicitly marked incomplete;
 6. keeps P69 external transcripts as outbound links and loads external images only
    when a visitor selects them in the viewer.
 
 Requests use fixed FactGrid hosts and paths, blocked redirects, timeouts, response
 size limits, bounded result counts, and an identifying user agent. Search snippets
 and rendered MediaWiki HTML are not trusted or displayed.
+
+`eligibility.ts` separates readable-tablet eligibility from editable-entity
+eligibility. The verified P3 subclass closure currently contains only Q512006,
+**Clay tablet**. It is not an Old Assyrian class. No alternative classification
+was admitted without live evidence. Direct tablet URLs use API entities
+independently of discovery-index presence.
+
+The operator runs `scripts/refresh-catalogue-index.mjs` outside visitor requests.
+It discovers bounded, strictly ordered QID batches, projects discovery metadata,
+resolves facet labels, checkpoints progress, and publishes after exhaustion and
+count validation. Invalid refreshes retain the published artifact; the runtime
+retains its last successfully validated in-memory index. Operations documents
+the refresh procedure and limits of a nontransactional RDF scan.
+
+Optional document and related-label reads use `no-store` so manual source retries
+can recover immediately. Core metadata retains its short revalidation window.
+There are no timer retries or per-edition request fan-outs. A batch transport
+failure is shown on each affected edition.
 
 ## Authentication and sessions
 
@@ -138,6 +158,16 @@ deliberately no local scholarly write journal.
 
 ## Rendering boundary
 
+Exact `CDLI-ATF-L-Q{qid}` editions with a recognized single ATF poem use escaped,
+verbatim text instead of the wikitext simplifier. Line breaks, directives,
+brackets, and notation are preserved. ATF remains read-only and cannot enter the
+D-page splice contract. Edition anchors preserve linked-statement order,
+including failed editions, and open the requested disclosure after loading.
+
+`/api/version` exposes only an explicitly supplied build revision, eligibility
+policy, and discovery freshness/count. It performs no FactGrid requests and does
+not infer deployment success from a Git push.
+
 `/tablets/[qid]/edit` renders a public record header and an access message. It
 loads the uncached full entity DTO and mounts editing controls only after
 `/api/session` confirms an authenticated, eligible contributor. There is no second
@@ -164,6 +194,10 @@ are fetched directly by the browser only after the reader activates the viewer;
 unsupported models remain source links.
 
 ## Simplicity review — 29 September 2026
+
+This is a historical review. The November 2026 expansion adds a compact discovery
+artifact; it does not add a scholarly text replica or change the single-instance
+session-store requirement.
 
 The application remains one Next.js service with direct FactGrid API calls and a
 SQLite session store. There is no separate backend service, queue, local catalogue,

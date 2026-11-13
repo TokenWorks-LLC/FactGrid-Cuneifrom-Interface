@@ -6,12 +6,15 @@ import { ArrowLeft, ExternalLink, FileText, LockKeyhole, PencilLine } from "luci
 
 import { EditionComparison } from "@/components/edition-comparison";
 import { EditionEditGate } from "@/components/edition-edit-gate";
+import { EditionDetails } from "@/components/edition-details";
+import { ReadRetryButton } from "@/components/read-retry-button";
 import { TabletImageViewer } from "@/components/tablet-image-viewer";
 import { TabletModelViewer } from "@/components/tablet-model-viewer";
 import { UnicodeText } from "@/components/unicode-text";
 import { Badge } from "@/components/ui/badge";
 import { isEditTargetEnabled, parseAllowedEditTargets } from "@/lib/edit/targets";
-import { FactGridNotFoundError, type LabeledEntity, type QuantityValue, type SourceLink, type TabletEdition } from "@/lib/factgrid";
+import { sanitizeReturnPath } from "@/lib/auth/config";
+import { FactGridNotFoundError, isFactGridError, type LabeledEntity, type QuantityValue, type SourceLink, type TabletEdition } from "@/lib/factgrid";
 import { getTablet } from "@/lib/factgrid/server";
 import { wikitextToPlainText } from "@/lib/wikitext-display";
 
@@ -19,7 +22,10 @@ export const revalidate = 300;
 
 const allowedEditTargets = parseAllowedEditTargets(process.env.FACTGRID_ALLOWED_EDIT_TARGETS);
 
-type TabletPageProps = { params: Promise<{ qid: string }> };
+type TabletPageProps = {
+  params: Promise<{ qid: string }>;
+  searchParams: Promise<{ returnTo?: string | string[] }>;
+};
 
 export async function generateMetadata({ params }: TabletPageProps): Promise<Metadata> {
   const { qid } = await params;
@@ -35,15 +41,31 @@ export async function generateMetadata({ params }: TabletPageProps): Promise<Met
   }
 }
 
-export default async function TabletPage({ params }: TabletPageProps) {
+export default async function TabletPage({ params, searchParams }: TabletPageProps) {
   // Access messaging reflects the running deployment, not an ISR artifact.
   await connection();
   const { qid } = await params;
+  const rawReturnTo = (await searchParams).returnTo;
+  const safeReturnTo = sanitizeReturnPath(typeof rawReturnTo === "string" ? rawReturnTo : undefined);
+  const catalogueUrl = safeReturnTo === "/browse" || safeReturnTo.startsWith("/browse?") ? safeReturnTo : "/browse";
   let tablet;
   try {
     tablet = await getTablet(qid);
   } catch (error) {
-    if (error instanceof FactGridNotFoundError) notFound();
+    if (error instanceof FactGridNotFoundError) {
+      if (error.code === "NOT_IN_CATALOGUE") {
+        return <RecordReadFailure qid={qid} title="This item is not a supported tablet" message="The FactGrid item exists, but its current classification does not establish eligibility for this tablet interface." />;
+      }
+      notFound();
+    }
+    if (isFactGridError(error)) {
+      if (error.code === "INVALID_INPUT") notFound();
+      const transient = error.code === "UPSTREAM_TIMEOUT" || error.code === "UPSTREAM_UNAVAILABLE";
+      return <RecordReadFailure qid={qid}
+        title={transient ? "FactGrid is temporarily unavailable" : "The FactGrid response could not be validated"}
+        message={transient ? "The authoritative record could not be retrieved. Try again when FactGrid is available." : "The source response was incomplete, malformed, or exceeded the permitted read size. This is a source-read failure, not evidence that the tablet is missing."}
+        retryable={error.retryable} />;
+    }
     throw error;
   }
 
@@ -56,7 +78,7 @@ export default async function TabletPage({ params }: TabletPageProps) {
         id: edition.editionId ?? `edition-${index + 1}`,
         label: edition.label,
         sourceTitle: edition.reference?.title ?? `Edition ${index + 1}`,
-        text: wikitextToPlainText(transcript.displayText),
+        text: transcript.format === "atf-v1" ? transcript.displayText : wikitextToPlainText(transcript.displayText),
         kind: edition.kind,
       },
     ];
@@ -68,7 +90,7 @@ export default async function TabletPage({ params }: TabletPageProps) {
         <div className="site-container py-10 sm:py-14">
           <Link
             className="focus-ring inline-flex min-h-11 items-center gap-2 text-sm font-medium text-muted-foreground hover:text-foreground"
-            href="/browse"
+            href={catalogueUrl}
           >
             <ArrowLeft aria-hidden="true" className="size-4" />
             Back to catalogue
@@ -145,6 +167,16 @@ export default async function TabletPage({ params }: TabletPageProps) {
         </aside>
 
         <div className="order-1 min-w-0 lg:order-2">
+          {(tablet.readWarnings?.length || tablet.editions.some((edition) => edition.status === "error")) ? (
+            <div className="mb-8 border border-border bg-secondary/40 p-5" role="status">
+              <p className="font-medium">Some optional sources could not be loaded</p>
+              {(tablet.readWarnings ?? []).map((warning, index) => (
+                <p className="mt-2 text-sm leading-6 text-muted-foreground" key={`${warning.code}-${index}`}>{warning.message} Unresolved values retain their FactGrid IDs and source links.</p>
+              ))}
+              {tablet.editions.some((edition) => edition.status === "error") ? <p className="mt-2 text-sm leading-6 text-muted-foreground">The affected editions are identified below. Available metadata and editions remain readable.</p> : null}
+              {tablet.readWarnings?.some((warning) => warning.retryable) || tablet.editions.some((edition) => edition.retryable) ? <div className="mt-3"><ReadRetryButton /></div> : null}
+            </div>
+          ) : null}
           {tablet.images.length > 0 ? <div className="mb-12"><TabletImageViewer images={tablet.images} /></div> : null}
           {tablet.models.length > 0 ? (
             <section aria-labelledby="models-heading" className="mb-12 border-b border-border pb-10">
@@ -354,10 +386,16 @@ function EditionSection({
   const restrictedTargetEnabled = Boolean(
     edition.reference && isEditTargetEnabled(edition.reference, "restricted", allowedEditTargets),
   );
-  const editEligible = Boolean(transcript?.editable);
+  const editEligible = Boolean(edition.status === "loaded" && edition.kind === "d" && transcript?.editable);
   const statusLabel =
     edition.status === "missing"
       ? "Missing page"
+      : edition.status === "error"
+        ? edition.retryable ? "Temporarily unavailable" : "Invalid response"
+      : edition.status === "unsupported"
+        ? "Unsupported format"
+      : edition.status === "invalid"
+        ? "Unsupported link"
       : edition.status !== "loaded"
         ? "Read only"
         : editEligible
@@ -404,7 +442,7 @@ function EditionSection({
       </div>
 
       {revision ? (
-        <details className="group mt-6" open={expandedByDefault}>
+        <EditionDetails anchor={`edition-${index + 1}`} expandedByDefault={expandedByDefault}>
           <summary className="focus-ring flex min-h-11 cursor-pointer list-none items-center justify-between gap-4 border-y border-border py-3 text-sm font-semibold">
             Edition text and notes
             <span
@@ -437,7 +475,7 @@ function EditionSection({
                 </div>
               ) : (
                 <pre className="transcript-text mt-4 overflow-x-auto border border-border bg-card p-5 text-sm leading-7 break-words whitespace-pre-wrap sm:p-7">
-                  {wikitextToPlainText(transcript.displayText) ||
+                  {(transcript.format === "atf-v1" ? transcript.displayText : wikitextToPlainText(transcript.displayText)) ||
                     "The recognized transcript region is empty."}
                 </pre>
               )}
@@ -476,7 +514,7 @@ function EditionSection({
             </div>
           ) : null}
 
-          {transcript?.editable && edition.editionId && historyUrl ? (
+          {editEligible && transcript && edition.editionId && historyUrl ? (
             <EditionEditGate
               editionId={edition.editionId}
               historyUrl={historyUrl}
@@ -489,14 +527,34 @@ function EditionSection({
 
           <p className="mt-6 flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
             <span>Revision {revision.revisionId}</span>
+            <time dateTime={revision.timestamp}>{revision.timestamp}</time>
             <span>Retrieved from a {revision.contentModel} page</span>
           </p>
-        </details>
+        </EditionDetails>
       ) : (
         <p className="mt-6 max-w-[68ch] text-sm leading-6 text-muted-foreground">
           {edition.reason ?? "This linked page could not be read in a supported format."}
         </p>
       )}
     </section>
+  );
+}
+
+function RecordReadFailure({ qid, title, message, retryable = false }: {
+  qid: string; title: string; message: string; retryable?: boolean;
+}) {
+  return (
+    <main className="site-container py-16" id="main-content">
+      <div className="max-w-2xl border-y border-border py-10">
+        <p className="font-mono text-xs text-muted-foreground">{qid}</p>
+        <h1 className="mt-4 font-heading text-4xl font-medium">{title}</h1>
+        <p className="mt-4 leading-7 text-muted-foreground">{message}</p>
+        <div className="mt-6 flex flex-wrap items-center gap-5">
+          {retryable ? <ReadRetryButton label="Try again" /> : null}
+          <a className="focus-ring inline-flex min-h-11 items-center text-sm underline" href={`https://database.factgrid.de/wiki/Item:${encodeURIComponent(qid)}`} rel="noreferrer" target="_blank">Open FactGrid record</a>
+          <Link className="focus-ring inline-flex min-h-11 items-center text-sm underline" href="/browse">Browse tablets</Link>
+        </div>
+      </div>
+    </main>
   );
 }

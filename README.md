@@ -21,6 +21,25 @@ The MVP provides:
 - fail-closed editing when OAuth, the feature switch, or contributor policy denies it.
 - account-scoped dirty-draft recovery across reloads and application navigation.
 
+## Catalogue coverage and source reliability
+
+The verified tablet class is **Clay tablet** (`P2=Q512006`), not an Old
+Assyrian classification. The read policy is versioned independently of the edit
+policy. A record URL does not depend on discovery-index membership. Existing
+items without a verified tablet classification remain unsupported.
+
+Linked editions and related labels are optional reads: an unavailable edition
+must not hide authoritative tablet metadata. `CDLI-ATF-L-Q{qid}` editions are
+read-only and preserve their ATF line structure and notation.
+
+Full-catalogue browsing requires the compact discovery index described in
+[Operations](docs/operations.md). It contains discovery metadata, never edition
+text or an editable entity copy. Without a valid index, the interface identifies
+its live-search coverage limits; it does not claim a complete catalogue.
+
+See the [corpus expansion report](docs/handoffs/factgrid-full-corpus-expansion-report.md)
+for live evidence, validation results, and release prerequisites.
+
 OAuth and writes are implemented and contract-tested, but are not configured
 or claimed as live-verified. They require a FactGrid-approved OAuth consumer, an
 approved contributor policy, and a designated write-test record. Public reading works
